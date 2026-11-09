@@ -7,7 +7,7 @@ export const MODELS = {
   fast: 'claude-haiku-5-5',
 };
 
-export async function claude(env, { model = MODELS.research, system, messages, maxTokens = 4000, tools, temperature }) {
+export async function claude(env, { model = MODELS.research, system, messages, maxTokens = 4000, tools, temperature, _continues = 0 }) {
   if (!env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set');
   const body = { model, max_tokens: maxTokens, messages };
   if (system) body.system = system;
@@ -26,7 +26,21 @@ export async function claude(env, { model = MODELS.research, system, messages, m
     });
     if (r.ok) {
       const data = await r.json();
-      const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
+      // Long web-search turns can pause; continue them (up to 3 times) so the answer is complete.
+      if (data.stop_reason === 'pause_turn' && _continues < 3) {
+        return claude(env, {
+          model, system, maxTokens, tools, temperature,
+          messages: [...messages, { role: 'assistant', content: data.content }],
+          _continues: _continues + 1,
+        });
+      }
+      // With web search the answer is split into citation blocks; keep only the text after the last
+      // search and join it without separators so JSON strings aren't broken.
+      const content = data.content || [];
+      let lastTool = -1;
+      content.forEach((c, i) => { if (c.type !== 'text') lastTool = i; });
+      const after = content.slice(lastTool + 1).filter(c => c.type === 'text').map(c => c.text).join('');
+      const text = after.trim() ? after : content.filter(c => c.type === 'text').map(c => c.text).join('');
       return { text, data };
     }
     lastErr = `${r.status} ${await r.text()}`;

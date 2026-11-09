@@ -125,7 +125,29 @@ export function extractJson(text) {
   const start = body.indexOf('{');
   const end = body.lastIndexOf('}');
   if (start < 0 || end < 0) throw new Error('No JSON in model reply');
-  return JSON.parse(body.slice(start, end + 1));
+  const raw = body.slice(start, end + 1);
+  try { return JSON.parse(raw); } catch (e) {
+    return JSON.parse(escapeControlCharsInStrings(raw));
+  }
+}
+
+// Models sometimes put raw line breaks or tabs inside JSON strings; escape them.
+function escapeControlCharsInStrings(s) {
+  let out = '', inStr = false, esc = false;
+  for (const ch of s) {
+    if (inStr) {
+      if (esc) { out += ch; esc = false; continue; }
+      if (ch === '\\') { out += ch; esc = true; continue; }
+      if (ch === '"') { inStr = false; out += ch; continue; }
+      const c = ch.charCodeAt(0);
+      if (c < 0x20) { out += ch === '\n' ? '\\n' : ch === '\t' ? '\\t' : ch === '\r' ? '' : ' '; continue; }
+      out += ch;
+    } else {
+      if (ch === '"') inStr = true;
+      out += ch;
+    }
+  }
+  return out;
 }
 
 export function fileUrl(env, key) {
