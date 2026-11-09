@@ -1,4 +1,10 @@
-# Estate agent outreach — first batch (awaiting Reece's approval)
+# Estate agent outreach
+
+**Now automated (from 9 Nov 2026):** the ops worker finds, verifies and emails agencies every weekday (10/day in week one, then 20/day),
+follows up after 7 days and handles replies. Templates live in `ops/src/outreach.js` (firstEmail, followUpEmail); the live prospect list
+is the D1 `prospects` table (GET /admin/prospects). Batch 1 below was sent by hand and is kept for reference.
+
+## First batch (sent by hand)
 
 Rules: only email limited companies/LLPs at their business address (PECR corporate subscribers), identify the sender,
 include an opt-out, and log every send and opt-out in business/agent_prospects.csv (status column).
