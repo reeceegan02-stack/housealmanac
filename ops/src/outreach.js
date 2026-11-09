@@ -98,12 +98,13 @@ For each one find, from their own website or its search snippets:
 Skip national corporate chains and their branches (e.g. Purplebricks, Connells, Your Move, Reeds Rains, Countrywide brands, haart, Foxtons, Savills, Knight Frank), lettings-only agents, and any agency where you can't find BOTH a published email and limited-company evidence.
 Skip these websites, we already know them: ${known.slice(-300).join(', ') || 'none'}.
 
-JSON only: {"agents": [{"agency": "trading name", "company": "registered name incl. Ltd/Limited/LLP", "company_no": "", "email": "", "website": "https://...", "evidence": "where you found the email and the company status"}]}` }],
+JSON only: {"agents": [{"agency": "the short trading name customers know, without branch, location or legal suffix (e.g. \"Julian Wadden\", not \"Julian Wadden & Co Limited (Didsbury)\")", "company": "registered name incl. Ltd/Limited/LLP", "company_no": "", "email": "", "website": "https://...", "evidence": "where you found the email and the company status"}]}` }],
   });
   let list = [];
   try { list = extractJson(text).agents || []; } catch (e) { list = []; }
   let added = 0, rejected = 0;
   for (const a of list) {
+    a.agency = cleanAgency(a.agency);
     const email = String(a.email || '').trim().toLowerCase();
     const ok = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(email) && !FREE_MAIL.test(email) && !CHAINS.test(`${a.agency} ${a.company} ${email}`)
       && /\b(ltd|limited|llp)\b/i.test(a.company || '');
@@ -117,6 +118,12 @@ JSON only: {"agents": [{"agency": "trading name", "company": "registered name in
   }
   await logEvent(env, null, 'prospects_found', { area, found: list.length, added, rejected });
   return { area, found: list.length, added, rejected };
+}
+
+// "Julian Wadden (Didsbury)" -> "Julian Wadden"; "Smith & Co Estate Agents Ltd" -> "Smith & Co"
+export function cleanAgency(name) {
+  return String(name || '').replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s*[-–|,].*$/, '')
+    .replace(/\b(estate agents?|estate agency|ltd|limited|llp|sales (&|and) lettings)\b\.?/gi, '').replace(/\s{2,}/g, ' ').trim() || String(name || '').trim();
 }
 
 // The address must appear on the agency's own site (home, contact or about page).
