@@ -1,7 +1,13 @@
 // Outbound email from hello@housealmanac.co.uk (Cloudflare Email Service) and message templates.
 import { BRAND, esc, bytesToBase64, logEvent } from './util.js';
 
-export async function sendMail(env, { to, subject, text, html, attachments, orderId, fromName = 'House Almanac', bcc = true }) {
+export async function sendMail(env, { to, subject, text, html, attachments, orderId, fromName = 'House Almanac', bcc = true, dedupeDays = 0 }) {
+  // Outreach guard: never send the same email to the same address twice within dedupeDays (e.g. on a retry).
+  if (dedupeDays) {
+    const dup = await env.DB.prepare(`SELECT 1 FROM events WHERE kind = 'email_sent' AND lower(json_extract(detail, '$.to')) = lower(?) AND json_extract(detail, '$.subject') = ? AND at >= ? LIMIT 1`)
+      .bind(to, subject, new Date(Date.now() - dedupeDays * 86400e3).toISOString()).first();
+    if (dup) { await logEvent(env, orderId, 'email_skipped_duplicate', { to, subject }); return { skipped: 'duplicate' }; }
+  }
   const msg = {
     to,
     from: { email: BRAND.from, name: fromName },

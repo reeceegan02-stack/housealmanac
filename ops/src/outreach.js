@@ -213,7 +213,7 @@ export async function sendFirstEmails(env, n) {
   for (const p of results) {
     const t = firstEmail(p, s.left > 0);
     try {
-      await sendMail(env, { to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac' });
+      await sendMail(env, { to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 6 });
       await env.DB.prepare(`UPDATE prospects SET status = 'emailed', last_contact = ?, followup_due = ? WHERE email = ?`).bind(now(), addDays(today(), 7), p.email).run();
       sent++;
     } catch (e) {
@@ -229,7 +229,7 @@ export async function startPreview(env, p) {
   const office = JSON.parse(p.office_json || 'null');
   if (!office) {
     const t = firstEmail(p, false);
-    await sendMail(env, { to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac' });
+    await sendMail(env, { to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 6 });
     await env.DB.prepare(`UPDATE prospects SET status = 'emailed', last_contact = ?, followup_due = ? WHERE email = ?`).bind(now(), addDays(today(), 7), p.email).run();
     return { plain: p.email };
   }
@@ -255,7 +255,7 @@ export async function sendPreviewEmail(env, order, street, proofBytes) {
   const t = proofBytes ? officePreviewEmail(p, street, s.left > 0) : firstEmail(p, false);
   const { jpegAttachment } = await import('./mail.js');
   await sendMail(env, {
-    to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac', orderId: order.id,
+    to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 6, orderId: order.id,
     attachments: proofBytes ? [jpegAttachment(proofBytes, `${street.replace(/[^A-Za-z0-9]+/g, '-')}-House-Almanac.jpg`)] : undefined,
   });
   await env.DB.prepare(`UPDATE prospects SET status = 'emailed', last_contact = ?, followup_due = ?, office_json = ? WHERE email = ?`)
@@ -271,7 +271,7 @@ export async function sendFollowUps(env) {
     const office = JSON.parse(p.office_json || '{}');
     const t = office.street ? officeFollowUpEmail(p, office.street, s.left > 0) : followUpEmail(p, s.left > 0);
     try {
-      await sendMail(env, { to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac' });
+      await sendMail(env, { to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 6 });
       await env.DB.prepare(`UPDATE prospects SET status = 'followed_up', last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), p.email).run();
       sent++;
     } catch (e) { /* try again tomorrow */ }
