@@ -53,12 +53,13 @@ export async function reconcileStripe(env) {
 }
 
 async function payForProof(env, o, s) {
+  const paidSource = o.source === 'partner-proof' ? 'partner-paid' : 'agent-paid';
   const ship = JSON.parse(o.ship_json || '{}');
   const sd = s.collected_information?.shipping_details || s.shipping_details;
   const a = sd?.address;
   const newShip = a?.postal_code ? { ...ship, name: sd.name || ship.name, line1: a.line1, line2: a.line2, city: a.city, county: a.state, postcode: a.postal_code } : ship;
-  await updateOrder(env, o.id, { external_ref: s.id, amount_pence: s.amount_total || 0, source: 'agent-paid', status: 'approved', ship_json: JSON.stringify(newShip) });
-  const order = { ...o, ship_json: JSON.stringify(newShip), source: 'agent-paid' };
+  await updateOrder(env, o.id, { external_ref: s.id, amount_pence: s.amount_total || 0, source: paidSource, status: 'approved', ship_json: JSON.stringify(newShip) });
+  const order = { ...o, ship_json: JSON.stringify(newShip), source: paidSource };
   try {
     const po = await createPrintOrder(env, order, fileUrl(env, o.file_key));
     await updateOrder(env, o.id, { status: 'printing', prodigi_id: po.id });

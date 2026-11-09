@@ -63,7 +63,9 @@ Please check:
 - the house number and street
 - anything in the story or timeline you know to be different
 
-${order.source === 'agent-preview'
+${order.source === 'partner-proof'
+  ? `It's yours to keep and share as a digital file. If you'd like it printed and framed (black frame, ready to hang, £89 delivered), just reply "yes" and I'll send a link. If you'd like anything changed, tell me what.`
+  : order.source === 'agent-preview'
   ? `If you're happy with it, just reply "yes" and we'll frame it for your branch. If you'd like anything else changed, reply and tell us what.`
   : order.source === 'agent-proof'
   ? `If it's right and you'd like it printed and framed for your buyer (£75, delivered to your branch), just reply "approved" and we'll send you the payment link. If you'd like changes, reply and tell us what to change.`

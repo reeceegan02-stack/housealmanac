@@ -9,6 +9,7 @@ import { stripeGet, stripePost } from './stripe.js';
 import { startOrderWorkflow } from './orders.js';
 import { agentPayLink } from './agents.js';
 
+const FRAMED_LINK = 'https://buy.stripe.com/4gM14p7UJfBSffW9512wU00';
 const IGNORE_FROM = /(no-?reply|do-?not-?reply|mailer-daemon|postmaster|notifications?@|bounce|@stripe\.com|@prodigi\.com|@cloudflare\.com|@etsy\.com|@google\.com|@github\.com)/i;
 
 export async function handleInbound(message, env, ctx) {
@@ -113,6 +114,18 @@ Classify the email and draft a reply. JSON only:
     }
   }
 
+  if (c.intent === 'approve' && order.source === 'partner-proof' && ['proof_sent', 'needs_attention'].includes(order.status) && order.file_key) {
+    // Free digital print for a press contact or partner: if they'd like it framed, send the £89 link; payment prints it.
+    const u = new URL(FRAMED_LINK);
+    u.searchParams.set('client_reference_id', order.id);
+    u.searchParams.set('prefilled_email', m.from);
+    await updateOrder(env, order.id, { status: 'awaiting_payment' });
+    await sendMail(env, {
+      to: m.from, orderId: order.id, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, fromName: 'Reece Egan-Sheath | House Almanac',
+      text: `Hi,\n\nGreat. Framed (black frame, ready to hang) and delivered it's £89, here:\n${u}\n\nYou can skip the address box at checkout; we already have it. As soon as it's paid it goes to print and arrives in 3 to 5 working days.\n\nBest wishes,\nReece\nHouse Almanac`,
+    });
+    return;
+  }
   if (c.intent === 'approve' && order.source === 'agent-proof' && ['proof_sent', 'needs_attention'].includes(order.status) && order.file_key) {
     // Free digital proof for an agent: approval means "we'd like it", so send the £75 payment link.
     const link = await agentPayLink(env, order.id, m.from);
@@ -211,6 +224,15 @@ JSON only:
   const c = await parseJson(env, text);
   await logEvent(env, null, 'agent_mail', { agency: prospect.agency, intent: c.intent });
 
+  if (c.intent === 'free_print_request' && /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/i.test(c.address || '')) {
+    const recent = (await env.DB.prepare(`SELECT count(*) n FROM orders WHERE source = 'partner-proof' AND created_at >= ?`).bind(new Date(Date.now() - 7 * 86400e3).toISOString()).first()).n;
+    if (recent >= 10) return escalate(env, m, null, 'Free digital print request over the weekly limit of 10; make it anyway if worthwhile.');
+    const { createOrder } = await import('./orders.js');
+    const order = await createOrder(env, { source: 'partner-proof', email: m.from, name: m.name || '', product: 'framed', amount_pence: 0, address: c.address, message: '', style: 'heritage', ship_json: '{}', external_ref: null });
+    await sendMail(env, { to: m.from, orderId: order.id, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac',
+      text: `Hi${m.name ? ' ' + m.name.split(' ')[0] : ''},\n\nLovely, thank you. I'm researching ${c.address.split(',').slice(0, 2).join(',')} now and will email you the print within 2 working days.\n\nBest wishes,\nReece\nHouse Almanac` });
+    return;
+  }
   if (c.intent === 'not_interested') {
     await env.DB.prepare(`UPDATE prospects SET status = 'opted_out', last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), prospect.email).run();
     return;
@@ -320,7 +342,8 @@ async function handleGeneral(env, m) {
     messages: [{ role: 'user', content: `Email from ${m.name || ''} <${m.from}>, subject "${m.subject}":
 """${m.body}"""
 
-JSON only: {"intent": "enquiry" | "needs_decision" | "not_interested" | "supplier_or_sales_pitch" | "spam" | "other", "reply": "reply to send for genuine customer or trade enquiries, else empty", "suggested_answer": "for needs_decision: what you would suggest Reece replies, else empty"}
+JSON only: {"intent": "enquiry" | "free_print_request" | "needs_decision" | "not_interested" | "supplier_or_sales_pitch" | "spam" | "other", "address": "for free_print_request: the full address (with postcode) they want the print made for, if given", "reply": "reply to send for genuine customer or trade enquiries, else empty", "suggested_answer": "for needs_decision: what you would suggest Reece replies, else empty"}
+"free_print_request" = a press contact, blogger, group or business partner replying to our pitch and taking up our offer of a free digital print of a street of their choice (if they gave no address, the reply should ask for it).
 "needs_decision" = anything the business facts and policies don't cover or that needs the owner: complaints asking for money or compensation, requests outside the policies, press or media, partnerships, wholesale or bulk deals, legal or data-protection requests, anything you're unsure of.` }],
   });
   const c = await parseJson(env, text);

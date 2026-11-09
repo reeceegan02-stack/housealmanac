@@ -15,6 +15,7 @@ What's on a print: the street on an Ordnance Survey 25-inch map from around 1890
 Process and timing: proof by email within 2 working days of ordering. The customer replies "approved" or asks for changes (unlimited reasonable changes). After approval, printing and dispatch take 2-4 working days, then 1-2 days delivery. Christmas: order by 9 December.
 
 Policies: personalised items can't be returned for change of mind once the proof is approved (Consumer Contracts Regulations exemption). Before approval, an order can be cancelled for a full refund. Damaged or faulty prints are replaced free (ask for a photo). Factual errors are reprinted free within 60 days.
+Press, bloggers, local groups and partners we've pitched may have a free digital print of a street of their choice (they send the address); if they want it framed it's £89.
 The name: an almanac is a book of dates, records and facts (like the old farmers' almanacs); a House Almanac print is that for one house: its maps, timeline, story and street sales, framed.
 AI: we use AI tools to help research and draft; every fact comes from a named source and the customer approves a proof first.
 New-build homes: the print tells the story of the land before it was built on.
