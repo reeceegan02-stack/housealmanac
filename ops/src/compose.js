@@ -87,7 +87,21 @@ export function frameMap({ lat, lon, lines, boxW, boxH, devicePx, maxZoom, minSp
 
 // HTML for a tile mosaic covering a box. urlFor(z,x,y) -> src.
 // A tile that fails (e.g. at a county-sheet boundary) tries the alternative layers in turn, then hides.
-const TILE_ONERROR = "var a=(this.dataset.alts||'').split('|').filter(Boolean);if(a.length){this.dataset.alts=a.slice(1).join('|');this.src=a[0];}else{this.onerror=null;this.style.visibility='hidden';}";
+// Alternatives may be a parent tile at a lower zoom, shown cropped to the right quarter via "#vb=<object-view-box>".
+const TILE_ONERROR = "var a=(this.dataset.alts||'').split('|').filter(Boolean);if(a.length){var n=a[0].split('#vb=');this.dataset.alts=a.slice(1).join('|');this.style.objectViewBox=n[1]||'';this.src=n[0];}else{this.onerror=null;this.style.visibility='hidden';}";
+
+// Fallbacks for one historic tile: the same tile from the other county layers, then the matching part of
+// the parent tile one and two zoom levels out (coverage has gaps at full detail in places, e.g. Didsbury).
+export function histTileAlts(layers, primary, z, x, y) {
+  const ordered = [primary, ...layers.filter(l => l !== primary)];
+  const alts = ordered.slice(1).map(l => nlsTileUrl(l, z, x, y));
+  for (const dz of [1, 2, 3]) {
+    const n = 2 ** dz, qx = x % n, qy = y % n, pct = 100 / n;
+    const vb = `inset(${(qy * pct).toFixed(2)}% ${((n - 1 - qx) * pct).toFixed(2)}% ${((n - 1 - qy) * pct).toFixed(2)}% ${(qx * pct).toFixed(2)}%)`;
+    for (const l of ordered) alts.push(`${nlsTileUrl(l, z - dz, Math.floor(x / n), Math.floor(y / n))}#vb=${vb}`);
+  }
+  return alts;
+}
 
 export function tileLayer({ lat, lon, z, scale, boxW, boxH, urlFor, filter, altUrls }) {
   const [cx, cy] = project(lat, lon, z);
@@ -200,7 +214,7 @@ export function composeHtml({ data, geo, lines, histLayer, histAlts = [], todayT
 
   const heroTiles = histLayer
     ? tileLayer({ ...hero, boxW: heroBox.w, boxH: heroBox.h, urlFor: (z, x, y) => nlsTileUrl(histLayer, z, x, y), filter: theme.histFilter,
-        altUrls: (z, x, y) => histAlts.filter(l => l !== histLayer).map(l => nlsTileUrl(l, z, x, y)) })
+        altUrls: (z, x, y) => histTileAlts(histAlts, histLayer, z, x, y) })
     : '';
   const todayLayer = tileLayer({ ...today, boxW: todayBox.w, boxH: todayBox.h, urlFor: (z, x, y) => todayTiles.src[`${z}/${x}/${y}`] || '', filter: theme.todayFilter });
 
