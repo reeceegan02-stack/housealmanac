@@ -24,7 +24,7 @@ Standing approvals from Reece (9 Nov 2026): "full control" of marketing, orders,
 |---|---|---|---|
 | Unframed A3 | £39 | GLOBAL-FAP-A3 (EMA 200gsm) | £15.48 (£7 + £5.90 Evri next day + VAT) |
 | Framed A3, black classic | £89 | GLOBAL-CFP-A3 (no mount, acrylic) | £51.30 (£32 + £10.75 + VAT) |
-| Estate agent completion gift | from £65 | as above | never price below £65 |
+| Estate agent completion gift | £75, then £65 (code AGENCY10 after first paid order) | as above | never below £65; always paid up front |
 Stripe payment links: framed https://buy.stripe.com/4gM14p7UJfBSffW9512wU00 · unframed https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01
 Christmas: last order date 9 December.
 
@@ -68,6 +68,9 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - Owner's name appears only on /terms and /privacy (legal identity), not in page footers (Reece's wish, 9 Nov).
 - Agent prints carry the agency logo (largest image they email, FILES logo-<domain>) and a QR code to their reviews link (kv review-<domain>).
 - Agent Stripe link (£75): https://buy.stripe.com/00w14pgrf75m1p62GD2wU02
+- **Agency pricing (Reece, 9 Nov): payment always up front, no invoicing, credit or payment terms.** After an agency's first paid order the
+  worker emails code AGENCY10 (Stripe coupon "Returning agency discount", £10 off, only valid on the agent product) once per agency domain
+  (`ops/src/agents.js`); later pay links get &prefilled_promo_code=AGENCY10 automatically.
 - **Cron every 30 min**: Prodigi tracking → "on its way" email; retry stuck orders (3 tries then alert); Stripe reconciliation (paid sessions
   with no order get created, and hello@ is warned the webhook missed them); Monday weekly summary to hello@.
 - **Admin API** (header `x-admin-key` = Worker secret ADMIN_KEY; not stored anywhere — rotate it in Worker settings if you need access):

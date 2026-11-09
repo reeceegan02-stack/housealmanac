@@ -6,6 +6,7 @@ import { sendMail, orderReceivedEmail } from './mail.js';
 import { logEvent, BRAND, getOrder, updateOrder, fileUrl } from './util.js';
 import { createPrintOrder } from './prodigi.js';
 import { approvedEmail } from './mail.js';
+import { maybeSendAgencyCode } from './agents.js';
 
 export async function ingestStripeSession(env, sessionId) {
   const s = await stripeGet(env, `/checkout/sessions/${sessionId}`);
@@ -20,6 +21,7 @@ export async function ingestStripeSession(env, sessionId) {
   if (fields.email && order.isNew) {
     const t = orderReceivedEmail({ ...fields, id: order.id });
     await sendMail(env, { to: fields.email, subject: t.subject, text: t.text, orderId: order.id });
+    await maybeSendAgencyCode(env, fields.email, order.id);
   }
   return { order: order.id, isNew: order.isNew };
 }
@@ -63,6 +65,7 @@ async function payForProof(env, o, s) {
     await logEvent(env, o.id, 'prodigi_order', { id: po.id, paid: s.amount_total });
     const t = approvedEmail(order);
     await sendMail(env, { to: ship.agent_email || o.email, subject: t.subject, text: t.text, orderId: o.id });
+    await maybeSendAgencyCode(env, ship.agent_email || o.email, o.id);
   } catch (e) {
     await updateOrder(env, o.id, { status: 'needs_attention', notes: 'Prodigi order failed after payment: ' + e.message });
     await sendMail(env, { to: BRAND.from, bcc: false, subject: `ACTION NEEDED: paid agent order ${o.id} didn't reach Prodigi`, text: e.message });

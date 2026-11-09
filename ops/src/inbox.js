@@ -7,6 +7,7 @@ import { sendMail, approvedEmail, firstName } from './mail.js';
 import { createPrintOrder } from './prodigi.js';
 import { stripeGet, stripePost } from './stripe.js';
 import { startOrderWorkflow } from './orders.js';
+import { agentPayLink } from './agents.js';
 
 const IGNORE_FROM = /(no-?reply|do-?not-?reply|mailer-daemon|postmaster|notifications?@|bounce|@stripe\.com|@prodigi\.com|@cloudflare\.com|@etsy\.com|@google\.com|@github\.com)/i;
 
@@ -114,13 +115,13 @@ Classify the email and draft a reply. JSON only:
 
   if (c.intent === 'approve' && order.source === 'agent-proof' && ['proof_sent', 'needs_attention'].includes(order.status) && order.file_key) {
     // Free digital proof for an agent: approval means "we'd like it", so send the £75 payment link.
-    const link = `${env.AGENT_LINK}?client_reference_id=${order.id}&prefilled_email=${encodeURIComponent(m.from)}`;
+    const link = await agentPayLink(env, order.id, m.from);
     await updateOrder(env, order.id, { status: 'awaiting_payment' });
     await sendMail(env, {
       to: m.from, orderId: order.id, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, fromName: 'Reece Egan-Sheath | House Almanac',
       text: `Hi,
 
-Great, thank you. To have it printed, framed and delivered to your branch, it's £75 here (card, Apple Pay or Google Pay):
+Great, thank you. To have it printed, framed and delivered to your branch, it's ${link.includes('prefilled_promo_code') ? '£65 with your agency discount' : '£75'} here (card, Apple Pay or Google Pay):
 ${link}
 
 As soon as it's paid we send it to print, and it's dispatched within 2 to 4 working days with tracking. Your receipt comes from Stripe.
@@ -235,7 +236,7 @@ JSON only:
       await sendMail(env, { to: m.from, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac', orderId: preview.id,
         text: `Hi,\n\nLovely, it's gone to print. It will arrive at your branch framed and ready to hang in 3 to 5 working days, and I'll email you the tracking when it ships.\n\nWhen you have a buyer completing, just send me their new address and the message you'd like on it, and I'll email you a free proof of theirs.\n\nBest wishes,\nReece\nHouse Almanac` });
     } else {
-      const link = `${env.AGENT_LINK}?client_reference_id=${preview.id}&prefilled_email=${encodeURIComponent(m.from)}`;
+      const link = await agentPayLink(env, preview.id, m.from);
       await updateOrder(env, preview.id, { status: 'awaiting_payment' });
       await env.DB.prepare(`UPDATE prospects SET status = 'interested', last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), prospect.email).run();
       await sendMail(env, { to: m.from, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac', orderId: preview.id,
