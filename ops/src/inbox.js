@@ -40,6 +40,11 @@ export async function handleInbound(message, env, ctx) {
 
   await logEvent(env, null, 'inbox', { from, subject, chars: body.length, forwarded });
 
+  // 0a. Reece replying to an ACTION NEEDED email: his reply goes to the customer from hello@.
+  if (env.FORWARD_TO && from === env.FORWARD_TO.toLowerCase() && /ACTION NEEDED: reply to/i.test(subject)) {
+    if (await relayOwnerReply(env, subject, body)) return;
+  }
+
   // 0. Reece forwarding an Etsy "You made a sale" email (stopgap until the Etsy API is connected).
   const fullText = (mail.text || htmlToText(mail.html || '')).slice(0, 20000);
   if (env.FORWARD_TO && from === env.FORWARD_TO.toLowerCase() && /etsy/i.test(fullText) && /(made a sale|order number|order #|receipt|transaction)/i.test(fullText)) {
@@ -76,10 +81,12 @@ Email from ${m.from}, subject "${m.subject}", ${m.attachments.length} attachment
 """${m.body}"""
 
 Classify the email and draft a reply. JSON only:
-{"intent": "approve" | "changes" | "cancel" | "damaged" | "question" | "thanks" | "other",
+{"intent": "approve" | "changes" | "cancel" | "damaged" | "question" | "needs_decision" | "thanks" | "other",
+ "suggested_answer": "for needs_decision: what you'd suggest Reece replies",
  "change_request": "if intent is changes: the exact changes requested, else empty",
  "reply": "the reply to send (empty if intent is approve, changes or thanks, since those get standard replies)"}
-"approve" only if they clearly approve the proof as it is. If they approve but also ask for any change, that's "changes".` }],
+"approve" only if they clearly approve the proof as it is. If they approve but also ask for any change, that's "changes".
+"needs_decision" = anything the policies don't cover or that needs the owner (refund or compensation after approval, complaints, cancellation after printing, legal or data requests, anything you're unsure of).` }],
   });
   const c = await parseJson(env, text);
   await logEvent(env, order.id, 'inbox_classified', c);
@@ -170,6 +177,7 @@ House Almanac`,
     }
   }
   if (c.intent === 'thanks') return;
+  if (c.intent === 'needs_decision') return escalate(env, m, order, c.suggested_answer);
   if (c.reply) await sendMail(env, { to: m.from, orderId: order.id, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, text: c.reply });
 }
 
@@ -311,11 +319,44 @@ async function handleGeneral(env, m) {
     messages: [{ role: 'user', content: `Email from ${m.name || ''} <${m.from}>, subject "${m.subject}":
 """${m.body}"""
 
-JSON only: {"intent": "enquiry" | "supplier_or_sales_pitch" | "spam" | "other", "reply": "reply to send for genuine customer or trade enquiries, else empty"}` }],
+JSON only: {"intent": "enquiry" | "needs_decision" | "supplier_or_sales_pitch" | "spam" | "other", "reply": "reply to send for genuine customer or trade enquiries, else empty", "suggested_answer": "for needs_decision: what you would suggest Reece replies, else empty"}
+"needs_decision" = anything the business facts and policies don't cover or that needs the owner: complaints asking for money or compensation, requests outside the policies, press or media, partnerships, wholesale or bulk deals, legal or data-protection requests, anything you're unsure of.` }],
   });
   const c = await parseJson(env, text);
   await logEvent(env, null, 'general_mail', { from: m.from, intent: c.intent });
-  if (c.intent === 'enquiry' && c.reply) await sendMail(env, { to: m.from, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, text: c.reply });
+  const reSubject = m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`;
+  if (c.intent === 'needs_decision') return escalate(env, m, null, c.suggested_answer);
+  if (c.intent === 'enquiry' && c.reply) await sendMail(env, { to: m.from, subject: reSubject, text: c.reply });
+}
+
+// Outside policy: send a holding reply and ask Reece (via hello@ -> Gmail) for a decision.
+async function escalate(env, m, order, suggestion) {
+  const name = (m.name || order?.name || '').split(' ')[0];
+  await sendMail(env, {
+    to: m.from, orderId: order?.id, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`,
+    text: `Hi${name ? ' ' + name : ''},\n\nThank you for your email. I want to give you a proper answer on this, so I'll come back to you within one working day.\n\nBest wishes,\nReece\nHouse Almanac`,
+  });
+  await sendMail(env, {
+    to: BRAND.from, bcc: false, orderId: order?.id,
+    subject: `ACTION NEEDED: reply to ${m.from}${order ? ` (order ${order.id})` : ''}: ${m.subject}`.slice(0, 180),
+    text: `This email needs a decision, so they've had a holding reply ("I'll come back to you within one working day").\n\nFrom: ${m.from}\nSubject: ${m.subject}\n\n---\n${String(m.body).slice(0, 3000)}\n---\n\nSuggested answer:\n${suggestion || '(none)'}\n\nTo answer: just reply to this email with what you'd like to say. Your reply is sent to them from hello@ (with your sign-off added if you leave it off).`,
+  });
+  await logEvent(env, order?.id || null, 'escalated', { from: m.from, subject: m.subject });
+}
+
+// Reece answering an ACTION NEEDED email: send his words to the customer from hello@.
+// Only to someone we escalated in the last 14 days, so this can't be used to email anyone else.
+async function relayOwnerReply(env, subject, body) {
+  const m = subject.match(/reply to ([^\s:()]+@[^\s:()]+)(?: \(order (HA-[A-Z0-9]{6})\))?: (.*)$/i);
+  if (!m) return false;
+  const [, to, orderId, origSubject] = m;
+  const ok = await env.DB.prepare(`SELECT 1 FROM events WHERE kind = 'escalated' AND lower(json_extract(detail, '$.from')) = lower(?) AND at >= ? LIMIT 1`)
+    .bind(to, new Date(Date.now() - 14 * 86400e3).toISOString()).first();
+  if (!ok || !body.trim()) return false;
+  const text = /best wishes|kind regards|thanks,|cheers/i.test(body.slice(-120)) ? body.trim() : `${body.trim()}\n\nBest wishes,\nReece\nHouse Almanac`;
+  await sendMail(env, { to, orderId: orderId || null, subject: origSubject.startsWith('Re:') ? origSubject : `Re: ${origSubject}`, text, fromName: 'Reece Egan-Sheath | House Almanac' });
+  await logEvent(env, orderId || null, 'owner_reply_sent', { to });
+  return true;
 }
 
 async function handleEtsyForward(env, text, subject) {

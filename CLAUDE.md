@@ -50,6 +50,8 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **Inbox**: hello@ → Email Routing → worker `email()` → copy forwarded to reeceegan02@gmail.com → Claude classifies:
   approve → Prodigi API order; changes → revised proof; cancel before approval → Stripe refund; damaged with photo → free replacement;
   agent replies → answered, free-sample orders created (cap 5), "no thanks" → opted out; general enquiries → answered.
+  Anything outside policy (complaints wanting money, press, partnerships, legal, unsure) → holding reply + "ACTION NEEDED: reply to …" to hello@;
+  Reece replies to that email and the worker sends his words to the customer from hello@ (only to addresses escalated in the last 14 days).
 - **Agent growth engine** (`ops/src/outreach.js`, Workflow `housealmanac-outreach`): weekdays 10:00 UTC the cron starts the day's run:
   Claude web search finds estate agents area by area (AREAS: Greater Manchester first, then North West, Yorkshire, UK) → only Ltd/LLP with a
   published email verified on their own website (PECR) → follow-ups for anyone due → for each new agency (10/day week one, then 20/day,
