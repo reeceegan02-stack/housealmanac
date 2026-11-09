@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>House Almanac — {{title}}</title>
+<style>
+  @page { size: 297mm 420mm; margin: 0; }
+  :root {
+    --paper: #f4eee2; --ink: #2a241e; --soft: #5b5145; --rule: #cbbfa9;
+    --brick: #9c3f2a; --frame: #e9e0cf;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 297mm; height: 420mm; background: var(--paper); }
+  body { position: relative; color: var(--ink); font-family: 'TeX Gyre Pagella', 'Palatino Linotype', Georgia, serif; overflow: hidden; }
+  .abs { position: absolute; }
+  .eyebrow { font-family: 'Inter', sans-serif; font-size: 7.5pt; letter-spacing: 0.32em; text-transform: uppercase; color: var(--brick); font-weight: 600; }
+  .label { font-family: 'Inter', sans-serif; font-size: 6.6pt; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); font-weight: 600; }
+  h1 { font-family: 'Lora', Georgia, serif; font-weight: 700; font-size: 46pt; line-height: 1; letter-spacing: -0.01em; }
+  .sub { font-family: 'Lora', Georgia, serif; font-style: italic; font-size: 14pt; color: var(--soft); }
+  .rule { height: 0; border-top: 0.5mm solid var(--ink); }
+  .hair { height: 0; border-top: 0.25mm solid var(--rule); }
+  .map { border: 0.35mm solid var(--ink); background: var(--frame); overflow: hidden; }
+  .map img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  p.body { font-size: 10.2pt; line-height: 1.42; margin-bottom: 2.6mm; text-align: left; hyphens: auto; }
+  p.body:first-of-type::first-letter { font-family: 'Lora', serif; font-weight: 700; float: left; font-size: 30pt; line-height: 0.9; padding: 1.2mm 1.6mm 0 0; color: var(--brick); }
+  .cap { font-family: 'Inter', sans-serif; font-size: 6.4pt; color: var(--soft); line-height: 1.35; }
+  .tl { display: grid; grid-template-columns: repeat(8, 1fr); gap: 0 3mm; }
+  .tl .item { border-top: 0.5mm solid var(--ink); padding-top: 2mm; position: relative; }
+  .tl .item::before { content: ''; position: absolute; top: -1.6mm; left: 0; width: 2.6mm; height: 2.6mm; border-radius: 50%; background: var(--paper); border: 0.5mm solid var(--ink); }
+  .tl .item.key { border-top-color: var(--brick); }
+  .tl .item.key::before { background: var(--brick); border-color: var(--brick); }
+  .tl .yr { font-family: 'Lora', serif; font-weight: 700; font-size: 12pt; margin-top: 1mm; }
+  .tl .what { font-size: 8.4pt; line-height: 1.3; margin-top: 1mm; color: var(--ink); }
+  .msg { font-family: 'Lora', serif; font-style: italic; font-size: 13pt; line-height: 1.35; }
+  .src { font-family: 'Inter', sans-serif; font-size: 5.6pt; color: var(--soft); line-height: 1.45; }
+  .ring { fill: var(--brick); fill-opacity: .13; stroke: var(--brick); }
+  .acc { color: var(--brick); } .inkc { color: var(--ink); }
+  .axis { stroke: var(--ink); } .softf { fill: var(--soft); } .inkf { fill: var(--ink); }
+  .dots { fill: var(--ink); fill-opacity: .85; } .accf { fill: var(--brick); }
+</style>
+<style>{{theme_css}}</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="abs eyebrow" style="left:16mm; top:15mm;">The House Almanac</div>
+<div class="abs label" style="right:16mm; top:15.4mm; text-align:right;">Ancoats · Manchester · M4</div>
+<div class="abs rule" style="left:16mm; right:16mm; top:20mm;"></div>
+<h1 class="abs" style="left:16mm; top:25mm;">Anita Street</h1>
+<div class="abs sub" style="left:16mm; top:45mm;">formerly Sanitary Street</div>
+<div class="abs cap" style="right:16mm; top:41mm; width:90mm; text-align:right; font-size:7pt;">The street as the Ordnance Survey drew it at 25 inches to the mile, in the edition of 1892–1914.</div>
+
+<!-- Hero map: OS 25-inch -->
+<div class="abs map hero" style="left:16mm; top:55mm; width:265mm; height:178.2mm;">
+  <img src="{{hero}}" alt="Ordnance Survey 25-inch map of Ancoats, 1892–1914, showing Sanitary Street">
+  <svg viewBox="0 0 1280 861" preserveAspectRatio="none" aria-hidden="true">
+    <ellipse cx="637" cy="415" rx="158" ry="30" transform="rotate(-22 637 415)" class="ring" stroke-width="3.2"/>
+  </svg>
+</div>
+<div class="abs cap" style="left:16mm; top:235mm; width:220mm;"><b class="acc">Your street is circled.</b> Ordnance Survey 25-inch map, 1892–1914 edition. Victoria Square sits across the road; Paragon and Sedgewick cotton mills lie a few streets away.</div>
+
+<!-- Story column -->
+<div class="abs" style="left:16mm; top:244mm; width:128mm;">
+  <div class="label" style="margin-bottom:3mm;">The story of your street</div>
+  <p class="body">Before it was Anita Street, it was Sanitary Street. Model homes were built here shortly after Victoria Square went up across the road in 1889–94 — the first council housing in Manchester.</p>
+  <p class="body">This was mill country: Paragon and Sedgewick cotton mills stood a few streets away. By 1815 Ancoats was already Manchester’s most populous district; in 1851 it was home to 53,737 people.</p>
+  <p class="body">A century on, residents had had enough of the name. In late 1951 they asked the council to change it, and by the spring of 1952 the street was Anita Street. Look closely: the new name was hiding in the old one — drop the S and the “-ry”.</p>
+</div>
+
+<!-- Today map -->
+<div class="abs map" style="left:153mm; top:244mm; width:128mm; height:85.3mm;">
+  <img src="{{today}}" alt="Today’s street map of the same area">
+  <svg viewBox="0 0 720 480" preserveAspectRatio="none" aria-hidden="true">
+    <ellipse cx="353" cy="233" rx="150" ry="30" transform="rotate(-22 353 233)" class="ring" stroke-width="3"/>
+  </svg>
+</div>
+<div class="abs cap" style="left:153mm; top:331mm; width:128mm;"><b class="inkc">The same streets today.</b> Victoria Square still stands, and the mills are homes and offices.</div>
+
+<!-- Timeline -->
+<div class="abs label" style="left:16mm; top:342mm;">Your street through time</div>
+<div class="abs tl" style="left:16mm; top:348mm; width:265mm;">
+  <div class="item"><div class="yr">c.1212</div><div class="what">Ancoats first recorded, as “Elnecot”</div></div>
+  <div class="item"><div class="yr">1798</div><div class="what">The Murray brothers open their cotton mills</div></div>
+  <div class="item"><div class="yr">1804</div><div class="what">The Rochdale Canal opens</div></div>
+  <div class="item"><div class="yr">1851</div><div class="what">53,737 people live in Ancoats</div></div>
+  <div class="item"><div class="yr">1889–94</div><div class="what">Victoria Square, the city’s first council homes</div></div>
+  <div class="item key"><div class="yr acc">1952</div><div class="what">Sanitary Street becomes Anita Street</div></div>
+  <div class="item"><div class="yr">1989</div><div class="what">Ancoats becomes a conservation area</div></div>
+  <div class="item"><div class="yr">2024</div><div class="what">Latest recorded sale on the street: £300,000</div></div>
+</div>
+
+<!-- Sales strip -->
+<div class="abs" style="left:16mm; top:372mm; width:128mm;">
+  <div class="label" style="margin-bottom:1.6mm;">Recorded sales on the street, 2003–2024</div>
+  <svg viewBox="0 0 640 110" style="width:128mm; height:22mm;" aria-label="Sale prices of homes on Anita Street, 2003 to 2024">
+    <line x1="30" y1="92" x2="630" y2="92" class="axis" stroke-width="1.6"/>
+    <g font-family="Inter, sans-serif" font-size="13" class="softf">
+      <text x="57.3" y="108" text-anchor="middle">2004</text><text x="330" y="108" text-anchor="middle">2014</text><text x="602.7" y="108" text-anchor="middle">2024</text>
+    </g>
+    <g class="dots">
+      <circle cx="55.3" cy="61.5" r="4.6"/><circle cx="63.4" cy="57.5" r="4.6"/><circle cx="71.7" cy="83.5" r="4.6"/><circle cx="75.4" cy="84.3" r="4.6"/><circle cx="134.2" cy="62.3" r="4.6"/><circle cx="202.3" cy="57.0" r="4.6"/><circle cx="245.7" cy="68.5" r="4.6"/><circle cx="293.6" cy="53.2" r="4.6"/><circle cx="343.2" cy="51.4" r="4.6"/><circle cx="435.7" cy="50.8" r="4.6"/><circle cx="440.4" cy="33.0" r="4.6"/><circle cx="448.8" cy="34.5" r="4.6"/><circle cx="524.6" cy="14.5" r="4.6"/><circle cx="541.2" cy="23.8" r="4.6"/>
+    </g>
+    <circle cx="608.6" cy="17" r="6" class="accf"/>
+    <g font-family="Inter, sans-serif" font-size="13" class="inkf" font-weight="600">
+      <text x="44" y="44">£122,000 (2003)</text>
+      <text x="630" y="44" text-anchor="end">£300,000 (2024)</text>
+    </g>
+  </svg>
+  <div class="cap" style="margin-top:1mm;">15 recorded sales; house numbers deliberately left off.</div>
+</div>
+
+<!-- Personal message + agency -->
+<div class="abs msgbox" style="left:153mm; top:372mm; width:128mm; height:30mm; border:0.35mm solid var(--ink); padding:4mm 5mm; display:flex; gap:5mm; align-items:center;">
+  <div style="flex:1;">
+    <div class="msg">Welcome to Anita Street, [Names]. May your story here be a happy one.</div>
+    <div class="label acc" style="margin-top:2.4mm;">With love from everyone at [Agency name]</div>
+  </div>
+  <div style="width:20mm; text-align:center;">
+    <img class="qr" src="qr.png" alt="QR code placeholder" style="width:18mm; height:18mm; display:block; margin:0 auto;">
+    <div class="cap" style="font-size:5.4pt; margin-top:0.8mm;">Review [Agency]</div>
+  </div>
+</div>
+
+<!-- Sources -->
+<div class="abs hair" style="left:16mm; right:16mm; top:406mm;"></div>
+<div class="abs src" style="left:16mm; top:407.5mm; width:265mm;">
+  Historic map: Ordnance Survey 25-inch, 1892–1914, reproduced with the permission of the National Library of Scotland (CC-BY). Today’s map: © OpenStreetMap contributors (ODbL).
+  Sales: pcdb.uk (sample; production uses HM Land Registry Price Paid Data, OGL). History: Manchester City Council, Ancoats Conservation Area; Manchester &amp; Lancashire Family History Society; Wikipedia, “Ancoats”. SAMPLE — not for sale.
+</div>
+
+</body>
+</html>

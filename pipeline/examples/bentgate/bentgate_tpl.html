@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>House Almanac — {{title}}</title>
+<style>
+  @page { size: 297mm 420mm; margin: 0; }
+  :root {
+    --paper: #f4eee2; --ink: #2a241e; --soft: #5b5145; --rule: #cbbfa9;
+    --brick: #9c3f2a; --frame: #e9e0cf;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 297mm; height: 420mm; background: var(--paper); }
+  body { position: relative; color: var(--ink); font-family: 'TeX Gyre Pagella', 'Palatino Linotype', Georgia, serif; overflow: hidden; }
+  .abs { position: absolute; }
+  .eyebrow { font-family: 'Inter', sans-serif; font-size: 7.5pt; letter-spacing: 0.32em; text-transform: uppercase; color: var(--brick); font-weight: 600; }
+  .label { font-family: 'Inter', sans-serif; font-size: 6.6pt; letter-spacing: 0.18em; text-transform: uppercase; color: var(--soft); font-weight: 600; }
+  h1 { font-family: 'Lora', Georgia, serif; font-weight: 700; font-size: 46pt; line-height: 1; letter-spacing: -0.01em; }
+  .sub { font-family: 'Lora', Georgia, serif; font-style: italic; font-size: 14pt; color: var(--soft); }
+  .rule { height: 0; border-top: 0.5mm solid var(--ink); }
+  .hair { height: 0; border-top: 0.25mm solid var(--rule); }
+  .map { border: 0.35mm solid var(--ink); background: var(--frame); overflow: hidden; }
+  .map img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  p.body { font-size: 10.2pt; line-height: 1.42; margin-bottom: 2.6mm; text-align: left; hyphens: auto; }
+  p.body:first-of-type::first-letter { font-family: 'Lora', serif; font-weight: 700; float: left; font-size: 30pt; line-height: 0.9; padding: 1.2mm 1.6mm 0 0; color: var(--brick); }
+  .cap { font-family: 'Inter', sans-serif; font-size: 6.4pt; color: var(--soft); line-height: 1.35; }
+  .tl { display: grid; grid-template-columns: repeat(8, 1fr); gap: 0 3mm; }
+  .tl .item { border-top: 0.5mm solid var(--ink); padding-top: 2mm; position: relative; }
+  .tl .item::before { content: ''; position: absolute; top: -1.6mm; left: 0; width: 2.6mm; height: 2.6mm; border-radius: 50%; background: var(--paper); border: 0.5mm solid var(--ink); }
+  .tl .item.key { border-top-color: var(--brick); }
+  .tl .item.key::before { background: var(--brick); border-color: var(--brick); }
+  .tl .yr { font-family: 'Lora', serif; font-weight: 700; font-size: 12pt; margin-top: 1mm; }
+  .tl .what { font-size: 8.4pt; line-height: 1.3; margin-top: 1mm; color: var(--ink); }
+  .msg { font-family: 'Lora', serif; font-style: italic; font-size: 13pt; line-height: 1.35; }
+  .src { font-family: 'Inter', sans-serif; font-size: 5.6pt; color: var(--soft); line-height: 1.45; }
+  .ring { fill: var(--brick); fill-opacity: .13; stroke: var(--brick); }
+  .acc { color: var(--brick); } .inkc { color: var(--ink); }
+  .axis { stroke: var(--ink); } .softf { fill: var(--soft); } .inkf { fill: var(--ink); }
+  .dots { fill: var(--ink); fill-opacity: .85; } .accf { fill: var(--brick); }
+  .hl { stroke: var(--brick); stroke-opacity: .32; }
+  p.body { hyphens: manual; }
+</style>
+<style>{{theme_css}}</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="abs eyebrow" style="left:16mm; top:15mm;">The House Almanac</div>
+<div class="abs label" style="right:16mm; top:15.4mm; text-align:right;">Newhey · Rochdale · OL16</div>
+<div class="abs rule" style="left:16mm; right:16mm; top:20mm;"></div>
+<h1 class="abs" style="left:16mm; top:25mm;">78 Bentgate Street</h1>
+<div class="abs sub" style="left:16mm; top:45mm;">Newhey · home of Cara &amp; Jordan</div>
+<div class="abs cap" style="right:16mm; top:45.5mm; width:80mm; text-align:right; font-size:7pt;">The street as the Ordnance Survey drew it at 25 inches to the mile, revised in 1907.</div>
+
+<!-- Hero map: OS 25-inch -->
+<div class="abs map hero" style="left:16mm; top:55mm; width:265mm; height:178.2mm;">
+  <img src="{{hero}}" alt="Ordnance Survey 25-inch map of Newhey, revised 1907, showing Bentgate Street">
+  <svg viewBox="0 0 2400 1614" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="738.4,1100.6 790.6,1085.9 868.6,1053.3 912.1,1030.1 961.8,1003.5 1037.4,964.8 1280.2,838.2 1358.6,793.3 1419.1,756.8 1545.8,643.6 1609.4,589.6 1648.8,535.2 1661.1,518.3" class="hl" fill="none" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</div>
+<div class="abs cap" style="left:16mm; top:235mm; width:250mm;"><b class="acc">Bentgate Street is highlighted.</b> Ordnance Survey 25-inch map, revised 1907. Garfield Mill stands by the River Beal at the street’s western end, with Ellenroad Mill just to the north.</div>
+
+<!-- Story column -->
+<div class="abs" style="left:16mm; top:244mm; width:128mm;">
+  <div class="label" style="margin-bottom:3mm;">The story of your street</div>
+  <p class="body">Bentgate Street is a mill street. In 1882 the Garfield Spinning Company built a cotton mill here, beside the River Beal, with 61,364 spindles spinning medium to super-fine yarn. Ten years later Ellenroad Mill went up just to the north. Both are on the map above.</p>
+  <p class="body">Newhey grew up around its mills. In 1828 it was described as “several ranges of cottages and two public houses”. The railway arrived in 1863, St Thomas’ church followed in 1876, and by 1911 Newhey’s ten cotton mills employed more than 2,000 people.</p>
+  <p class="body">Garfield Mill was demolished in 1969, and Ellenroad in 1985, all but its engine house, now Ellenroad Steam Museum. The fields south of the street on the old map are now houses, and number 78, first sold new in 2003, is one of the newest homes on a street the Ordnance Survey was already naming in 1907.</p>
+</div>
+
+<!-- Today map -->
+<div class="abs map" style="left:153mm; top:244mm; width:128mm; height:85.3mm;">
+  <img src="{{today}}" alt="Today’s street map of the same area">
+  <svg viewBox="0 0 960 640" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="249.2,466.8 275.3,459.5 314.3,443.2 336.0,431.5 360.9,418.2 398.7,398.9 520.1,335.6 559.3,313.2 589.5,294.9 652.9,238.3 684.7,211.3 704.4,184.1 710.5,175.7" class="hl" fill="none" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</div>
+<div class="abs cap" style="left:153mm; top:331mm; width:128mm;"><b class="inkc">The same streets today.</b> Ellenroad’s engine house still stands as a steam museum, and the M62 now runs past to the west.</div>
+
+<!-- Timeline -->
+<div class="abs label" style="left:16mm; top:342mm;">Your street through time</div>
+<div class="abs tl" style="left:16mm; top:348mm; width:265mm;">
+  <div class="item"><div class="yr">1828</div><div class="what">Newhey: “several ranges of cottages”</div></div>
+  <div class="item"><div class="yr">1863</div><div class="what">The railway reaches Newhey</div></div>
+  <div class="item"><div class="yr">1882</div><div class="what">Garfield Mill built on Bentgate Street</div></div>
+  <div class="item"><div class="yr">1892</div><div class="what">Ellenroad Mill built close by</div></div>
+  <div class="item"><div class="yr">1911</div><div class="what">Newhey’s ten mills employ 2,000+</div></div>
+  <div class="item"><div class="yr">1985</div><div class="what">Ellenroad demolished; its engine house survives</div></div>
+  <div class="item key"><div class="yr acc">2003</div><div class="what">Number 78 is sold as a new home</div></div>
+  <div class="item key"><div class="yr acc">2025</div><div class="what">Cara &amp; Jordan make it home</div></div>
+</div>
+
+<!-- Sales strip -->
+<div class="abs" style="left:16mm; top:372mm; width:128mm;">
+  <div class="label" style="margin-bottom:1.6mm;">Recorded sales on the street, 1996–2026</div>
+  <svg viewBox="0 0 640 110" style="width:128mm; height:22mm;" aria-label="Recorded sale prices on Bentgate Street, 1996 to 2026">
+    <line x1="30" y1="92" x2="630" y2="92" class="axis" stroke-width="1.6"/>
+    <g font-family="Inter, sans-serif" font-size="13" class="softf"><text x="30.0" y="108" text-anchor="middle">1996</text><text x="223.5" y="108" text-anchor="middle">2006</text><text x="417.1" y="108" text-anchor="middle">2016</text><text x="610.6" y="108" text-anchor="middle">2026</text></g>
+    <g class="dots"><circle cx="34.0" cy="79.7" r="4.4"/><circle cx="42.1" cy="80.0" r="4.4"/><circle cx="48.5" cy="82.5" r="4.4"/><circle cx="51.8" cy="79.0" r="4.4"/><circle cx="90.5" cy="78.0" r="4.4"/><circle cx="93.7" cy="80.8" r="4.4"/><circle cx="114.7" cy="77.0" r="4.4"/><circle cx="126.0" cy="77.3" r="4.4"/><circle cx="130.8" cy="80.8" r="4.4"/><circle cx="156.6" cy="72.0" r="4.4"/><circle cx="158.2" cy="83.5" r="4.4"/><circle cx="200.2" cy="59.7" r="4.4"/><circle cx="201.8" cy="65.3" r="4.4"/><circle cx="208.2" cy="64.5" r="4.4"/><circle cx="214.7" cy="62.7" r="4.4"/><circle cx="227.6" cy="59.4" r="4.4"/><circle cx="230.8" cy="59.0" r="4.4"/><circle cx="248.5" cy="49.3" r="4.4"/><circle cx="280.8" cy="65.3" r="4.4"/><circle cx="326.0" cy="57.0" r="4.4"/><circle cx="343.7" cy="49.0" r="4.4"/><circle cx="350.2" cy="56.3" r="4.4"/><circle cx="350.2" cy="65.3" r="4.4"/><circle cx="350.2" cy="60.8" r="4.4"/><circle cx="366.3" cy="62.0" r="4.4"/><circle cx="382.4" cy="69.6" r="4.4"/><circle cx="390.5" cy="61.0" r="4.4"/><circle cx="403.4" cy="53.0" r="4.4"/><circle cx="424.4" cy="62.7" r="4.4"/><circle cx="432.4" cy="59.7" r="4.4"/><circle cx="445.3" cy="55.3" r="4.4"/><circle cx="456.6" cy="52.0" r="4.4"/><circle cx="471.1" cy="56.0" r="4.4"/><circle cx="472.7" cy="53.7" r="4.4"/><circle cx="477.6" cy="57.0" r="4.4"/><circle cx="484.0" cy="52.0" r="4.4"/><circle cx="492.1" cy="54.7" r="4.4"/><circle cx="522.7" cy="45.3" r="4.4"/><circle cx="535.6" cy="41.7" r="4.4"/><circle cx="538.9" cy="38.7" r="4.4"/><circle cx="540.5" cy="29.5" r="4.4"/><circle cx="556.6" cy="54.7" r="4.4"/><circle cx="561.5" cy="53.7" r="4.4"/><circle cx="590.5" cy="49.3" r="4.4"/><circle cx="598.5" cy="37.0" r="4.4"/><circle cx="601.8" cy="15.3" r="4.4"/><circle cx="608.2" cy="58.0" r="4.4"/><circle cx="611.5" cy="22.0" r="4.4"/><circle cx="616.3" cy="29.7" r="4.4"/><circle cx="621.1" cy="32.0" r="4.4"/><circle cx="622.7" cy="30.3" r="4.4"/></g>
+    <g font-family="Inter, sans-serif" font-size="13" class="inkf" font-weight="600">
+      <text x="34" y="40">Typical sale 1996–2000: £38,000</text>
+      <text x="630" y="80" text-anchor="end">2022–2026: £165,000</text>
+    </g>
+  </svg>
+  <div class="cap" style="margin-top:1mm;">51 recorded sales. House numbers, number 78’s own sales and two very low transfers left off.</div>
+</div>
+
+<!-- Personal message -->
+<div class="abs msgbox" style="left:153mm; top:372mm; width:128mm; height:30mm; border:0.35mm solid var(--ink); padding:4mm 6mm; display:flex; flex-direction:column; justify-content:center;">
+  <div class="msg">Cara &amp; Jordan, here’s to every chapter still to come at number 78.</div>
+  <div class="label acc" style="margin-top:2.4mm;">Bentgate Street · Home since 2025</div>
+</div>
+
+<!-- Sources -->
+<div class="abs hair" style="left:16mm; right:16mm; top:406mm;"></div>
+<div class="abs src" style="left:16mm; top:407.5mm; width:265mm;">
+  Historic map: Ordnance Survey 25-inch, Lancashire sheet LXXXIX.6, revised 1907, published 1910, reproduced with the permission of the National Library of Scotland (CC-BY). Today’s map: © OpenStreetMap contributors (ODbL).
+  Sales and build year: HM Land Registry Price Paid Data (OGL), via doogal.co.uk. History: Manchester Victorian Architects, Stott &amp; Sons index; Wikipedia, “Newhey”, “Milnrow” and “Newhey tram stop”. SAMPLE.
+</div>
+
+</body>
+</html>
