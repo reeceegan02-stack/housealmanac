@@ -196,7 +196,8 @@ export async function perDay(env) {
   const days = (Date.parse(today()) - Date.parse(first)) / 86400e3;
   const base = days < 7 ? Number(env.OUTREACH_WARMUP_PER_DAY || 10) : Number(env.OUTREACH_PER_DAY || 20);
   const override = await outreachPerDayOverride(env); // set by the growth/ops agents, 0-40
-  return override ?? base;
+  if (override == null) return base;
+  return days < 7 ? Math.min(override, base) : override; // never above the warm-up rate in week one (deliverability)
 }
 
 async function poolSize(env) {
