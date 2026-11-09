@@ -28,7 +28,7 @@ Rules:
 - story: exactly 3 paragraphs, 150 to 190 words in total, each paragraph 40 to 75 words.
 - timeline: 6 to 8 items in ascending year order. The last one or two items are about this home and have "key": true (for example the year the street or house was built, and "<names> make it home" in the move-in year if given). Use the move-in year only as given by the customer.
 - Inside JSON string values never use double quotation marks; use single quotes ('like this') instead.
-- Output ONLY one JSON object matching the schema, no commentary.`;
+- Finish all your searching first, then output ONLY one JSON object matching the schema as your final message, no commentary.`;
 
 export async function researchStreet(env, ctx) {
   const salesSummary = summariseSales(ctx.sales);

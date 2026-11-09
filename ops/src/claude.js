@@ -59,7 +59,8 @@ export async function claude(env, { model = MODELS.research, system, messages, m
       let lastTool = -1;
       content.forEach((c, i) => { if (c.type !== 'text') lastTool = i; });
       const after = content.slice(lastTool + 1).filter(c => c.type === 'text').map(c => c.text).join('');
-      const text = after.trim() ? after : content.filter(c => c.type === 'text').map(c => c.text).join('');
+      // If the JSON came before a final search, the text after it has no JSON: use all the text then.
+      const text = after.includes('{') ? after : content.filter(c => c.type === 'text').map(c => c.text).join('');
       return { text, data };
     }
     lastErr = `${r.status} ${await r.text()}`;

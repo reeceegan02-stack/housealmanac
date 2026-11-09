@@ -20,6 +20,7 @@ export default {
     const p = url.pathname;
     try {
       if (p === '/' || p === '/health') {
+        // (version also in the x-ha-version header)
         const keys = Object.fromEntries(['ANTHROPIC_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'PRODIGI_API_KEY', 'ETSY_KEYSTRING'].map((k) => [k, !!env[k]]));
         return json({ ok: true, service: 'housealmanac-ops', time: now(), keys });
       }
