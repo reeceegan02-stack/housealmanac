@@ -1,0 +1,19 @@
+{
+  // House Almanac operations worker (orders, research, rendering, inbox, schedules)
+  "name": "housealmanac-ops",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "send_email": [{ "name": "EMAIL" }],
+  "browser": { "binding": "BROWSER" },
+  "d1_databases": [{ "binding": "DB", "database_name": "housealmanac-ops", "database_id": "4c5bdc59-6ee4-4a9d-a4ee-968c5a76ace5" }],
+  "kv_namespaces": [{ "binding": "FILES", "id": "b3de108bd54341ee843a5c93abe8c8a9" }],
+  "workflows": [{ "name": "housealmanac-order", "binding": "ORDER_FLOW", "class_name": "OrderWorkflow" }],
+  "triggers": { "crons": ["*/30 * * * *"] },
+  "vars": {
+    "PUBLIC_BASE": "https://housealmanac-ops.reeceegan02.workers.dev",
+    "FORWARD_TO": "reeceegan02@gmail.com",
+    "FREE_SAMPLES_CAP": "5"
+  }
+}

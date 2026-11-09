@@ -1,0 +1,16 @@
+{
+  "name": "housealmanac-ops",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "test": "node test/compose.test.mjs"
+  },
+  "dependencies": {
+    "@cloudflare/puppeteer": "1.4.0",
+    "postal-mime": "2.7.6"
+  },
+  "devDependencies": {
+    "wrangler": "4.158.0"
+  }
+}
