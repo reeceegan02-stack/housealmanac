@@ -14,8 +14,9 @@ export async function handleInbound(message, env, ctx) {
   await ensureSchema(env);
   const raw = await new Response(message.raw).arrayBuffer();
   // Keep Reece's copy of everything.
+  let forwarded = false;
   if (env.FORWARD_TO) {
-    try { await message.forward(env.FORWARD_TO); } catch (e) { console.error('forward failed', e); }
+    try { await message.forward(env.FORWARD_TO); forwarded = true; } catch (e) { console.error('forward failed', e); }
   }
   const mail = await PostalMime.parse(raw);
   const from = (mail.from?.address || message.from || '').toLowerCase();
@@ -24,13 +25,16 @@ export async function handleInbound(message, env, ctx) {
   const autoSubmitted = (message.headers.get('auto-submitted') || '').toLowerCase();
   const precedence = (message.headers.get('precedence') || '').toLowerCase();
 
-  if (from === BRAND.from || from.endsWith('@housealmanac.co.uk')) return; // our own copies
+  if (from === BRAND.from || from.endsWith('@housealmanac.co.uk')) { // our own copies
+    await logEvent(env, null, 'inbox_own', { subject, forwarded });
+    return;
+  }
   if (IGNORE_FROM.test(from) || (autoSubmitted && autoSubmitted !== 'no') || /bulk|list|junk/.test(precedence)) {
     await logEvent(env, null, 'inbox_ignored', { from, subject });
     return;
   }
 
-  await logEvent(env, null, 'inbox', { from, subject, chars: body.length });
+  await logEvent(env, null, 'inbox', { from, subject, chars: body.length, forwarded });
 
   // 1. Customer order?
   const idMatch = subject.match(/\b(HA-[A-Z0-9]{6})\b/) || body.match(/\b(HA-[A-Z0-9]{6})\b/);
