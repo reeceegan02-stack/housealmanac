@@ -49,14 +49,24 @@ This print is for an estate agency's own office at this address (${ctx.agency ||
 ` : ''}
 Schema:
 ${SCHEMA}`;
-  const { text } = await claude(env, {
+  const base = {
     model: MODELS.research,
     system: SYSTEM,
     maxTokens: 6000,
     tools: [webSearchTool(ctx.searches || 10)],
     messages: [{ role: 'user', content: prompt }],
-  });
-  return validate(await parseJson(env, text));
+  };
+  const { text, data } = await claude(env, base);
+  try {
+    return validate(await parseJson(env, text));
+  } catch (e) {
+    // The reply had no usable JSON (e.g. it stopped after searching): ask for the JSON in the same conversation.
+    const { text: again } = await claude(env, {
+      ...base, toolChoice: { type: 'none' },
+      messages: [...base.messages, { role: 'assistant', content: data.content }, { role: 'user', content: 'Now reply with only the final JSON object matching the schema, using what you found. Nothing else.' }],
+    });
+    return validate(await parseJson(env, again));
+  }
 }
 
 export async function reviseContent(env, prev, request, ctx) {

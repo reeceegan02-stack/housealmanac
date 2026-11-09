@@ -25,11 +25,12 @@ export const MODELS = {
   fast: 'claude-haiku-5-5',
 };
 
-export async function claude(env, { model = MODELS.research, system, messages, maxTokens = 4000, tools, temperature, _continues = 0 }) {
+export async function claude(env, { model = MODELS.research, system, messages, maxTokens = 4000, tools, toolChoice, temperature, _continues = 0 }) {
   if (!env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set');
   const body = { model, max_tokens: maxTokens, messages };
   if (system) body.system = system;
   if (tools) body.tools = tools;
+  if (toolChoice) body.tool_choice = toolChoice;
   if (temperature !== undefined) body.temperature = temperature;
   let lastErr;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -48,7 +49,7 @@ export async function claude(env, { model = MODELS.research, system, messages, m
       // Long web-search turns can pause; continue them (up to 3 times) so the answer is complete.
       if (data.stop_reason === 'pause_turn' && _continues < 3) {
         return claude(env, {
-          model, system, maxTokens, tools, temperature,
+          model, system, maxTokens, tools, toolChoice, temperature,
           messages: [...messages, { role: 'assistant', content: data.content }],
           _continues: _continues + 1,
         });
