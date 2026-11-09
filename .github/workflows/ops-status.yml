@@ -1,0 +1,30 @@
+# Copies the worker's privacy-safe status snapshot into the "Ops status" issue every 2 hours, so the
+# scheduled maintenance and growth agents (which can only reach GitHub) can see how the business is running.
+name: Ops status
+on:
+  schedule:
+    - cron: '17 */2 * * *'
+  workflow_dispatch: {}
+permissions:
+  issues: write
+  contents: read
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch status
+        run: curl -fsS --retry 3 --max-time 90 https://housealmanac-ops.reeceegan02.workers.dev/status.json -o status.json
+      - name: Update the Ops status issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          N=$(gh issue list -R "$GITHUB_REPOSITORY" --label ops-status --state open --json number --jq '.[0].number // empty')
+          printf 'Automatic snapshot from the ops worker (no personal data). Updated %s.\n\n```json\n' "$(date -u +%FT%TZ)" > body.md
+          cat status.json >> body.md
+          printf '\n```\n' >> body.md
+          if [ -z "$N" ]; then
+            gh label create ops-status -R "$GITHUB_REPOSITORY" --color 5319e7 --description "Automatic ops snapshot" 2>/dev/null || true
+            gh issue create -R "$GITHUB_REPOSITORY" --title "Ops status" --label ops-status --body-file body.md
+          else
+            gh issue edit "$N" -R "$GITHUB_REPOSITORY" --body-file body.md
+          fi

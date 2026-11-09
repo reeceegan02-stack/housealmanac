@@ -2,6 +2,7 @@
 import { OrderWorkflow } from './workflow.js';
 import { ingestStripeSession, reconcileStripe } from './stripe-orders.js';
 import { systemsCheck } from './check.js';
+import { cachedStatus, buildStatus } from './status.js';
 import { OutreachWorkflow, startDailyOutreach, findProspects, samplesStatus, startPreview } from './outreach.js';
 import { ensureSchema, json, getOrder, logEvent, updateOrder, now, fileUrl } from './util.js';
 import { verifyStripe, stripeGet, sessionToOrder } from './stripe.js';
@@ -24,6 +25,9 @@ export default {
         const keys = Object.fromEntries(['ANTHROPIC_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'PRODIGI_API_KEY', 'ETSY_KEYSTRING'].map((k) => [k, !!env[k]]));
         return json({ ok: true, service: 'housealmanac-ops', time: now(), keys });
       }
+
+      // Privacy-safe status snapshot for the maintenance agents (rebuilt every 30 min by the cron).
+      if (p === '/status.json') return json(await cachedStatus(env));
 
       // Public print/proof files (unguessable keys) for Prodigi and email links.
       if (p.startsWith('/f/')) {
@@ -132,6 +136,7 @@ async function admin(req, env, url) {
   if (p === '/etsy/poll' && req.method === 'POST') return json(await pollEtsy(env));
   if (p === '/stripe/reconcile' && req.method === 'POST') return json(await reconcileStripe(env));
   if (p === '/check') return json(await systemsCheck(env));
+  if (p === '/status/rebuild' && req.method === 'POST') return json(await buildStatus(env));
   // Admin-only: how long each key is (never the value), to spot empty or mis-pasted secrets.
   if (p === '/keys') return json(Object.fromEntries(['ANTHROPIC_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'PRODIGI_API_KEY', 'ETSY_KEYSTRING', 'ETSY_SHARED_SECRET']
     .map((k) => [k, typeof env[k] === 'string' ? env[k].length : null])));

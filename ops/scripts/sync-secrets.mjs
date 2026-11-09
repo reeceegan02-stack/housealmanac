@@ -25,6 +25,11 @@ const valueFor = (n) => {
   const k = Object.keys(process.env).find((key) => key.startsWith(n) && (process.env[key] || '').trim());
   return k ? process.env[k].trim() : '';
 };
+// Only the production branch may touch production secrets (preview builds of other branches must not).
+if (process.env.WORKERS_CI_BRANCH && process.env.WORKERS_CI_BRANCH !== 'main') {
+  console.log('sync-secrets: not the main branch, skipped');
+  process.exit(0);
+}
 const present = NAMES.filter((n) => valueFor(n));
 if (!present.length) {
   console.log('sync-secrets: no build secrets set, skipped');

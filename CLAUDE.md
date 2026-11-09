@@ -8,6 +8,11 @@ Standing approvals from Reece (9 Nov 2026): "full control" of marketing, orders,
 - Customer emails (proofs, order updates) and agent outreach/follow-ups: approved, no need to ask.
 - Prodigi orders for paid customer orders and approved agent free samples (batch 1: up to 5 x £51.30): approved.
 - Any other new purchase or subscription: tell Reece the item and total and get a yes first.
+- **Budget (Reece, 9 Nov 2026 17:05): £2,000 all-in.** "You are in full control... everything is approved if it's within budget. I am having
+  to do way too much — you need to be thinking about all of this and creating agents to monitor and maintain and keep running."
+  So: decide and act on marketing, ads, outreach, website, operations without asking. Only two things still go to Reece:
+  (1) any charge to his card — show item + total for a one-word yes (a hard rule), batching where possible; (2) things only he can do
+  (creating accounts, entering card/ID/keys). Track spend vs the £2,000 in business/ledger.csv (budget line at the bottom of this file).
 
 ## Rules that always apply
 - Never enter passwords, card/bank details or ID, never create accounts — Reece does those.
@@ -90,9 +95,23 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
   Once connected: cron pulls paid receipts → workflow → prints straight after the AI check (no proof; Etsy API can't message buyers) → tracking to Etsy.
   Stopgap until then: Reece forwards Etsy's "You made a sale" email to hello@ and the inbox creates the order (external_ref etsy-<receipt>, so no duplicates later).
 
+## Agents (monitoring, maintenance, growth) — nothing depends on Reece's laptop
+- Worker cron rebuilds a privacy-safe snapshot every 30 min → public https://housealmanac-ops.reeceegan02.workers.dev/status.json
+  (no names/emails/addresses; scrubbed). GitHub Action `.github/workflows/ops-status.yml` copies it every 2 h into the open issue
+  labelled `ops-status` ("Ops status"). Scheduled cloud sessions can only reach GitHub, so they read that issue.
+- **Daily maintenance agent** (scheduled task): reads the snapshot, fixes failures in code, pushes (auto-deploys). It acts through code and
+  config (e.g. OUTREACH_PAUSED, OUTREACH_PER_DAY in ops/wrangler.jsonc). Never commit personal data or secrets (the repo is public).
+- **Weekly growth agent** (scheduled task): reviews results, tunes outreach/website/Etsy copy, and queues press / gift-guide / partner emails in
+  `ops/outbox.json` (the worker sends them weekdays 9-17 UK, max OUTBOX_PER_DAY, once per id, honouring opt-outs; "no thanks" replies suppress).
+- Repo is PUBLIC (visibility can't be changed from here): keep it free of personal data; customer data stays in D1/KV only.
+
 ## Manual fallback runbook (only if the automation is down)
 1. Stripe → Transactions for new paid orders. 2. Research the street (sources for every fact). 3. Build the print with `pipeline/` (render300.py, 3508x4961).
 4. Check it. 5. Email the proof from hello@. 6. On approval, order from Prodigi (GB, GLOBAL-CFP-A3 or GLOBAL-FAP-A3, Standard). 7. Log in `business/ledger.csv`.
 
 ## Repo layout
 - `ops/` cloud operations worker · `site/` website · `pipeline/` print templates and render scripts · `marketing/` mockups, Etsy listing, ad copy · `business/` pricing model, ledger, prospects.
+
+## Budget tracker (£2,000 all-in, from 9 Nov 2026)
+Spent to 9 Nov: £42.08 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60). Committed: free framed samples up to 5 × £51.30.
+Keep this line current; the weekly growth agent recomputes it from business/ledger.csv.

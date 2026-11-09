@@ -5,6 +5,8 @@ import { sendMail, shippedEmail } from './mail.js';
 import { startOrderWorkflow } from './orders.js';
 import { pollEtsy, etsyMarkShipped, etsyApprovalWatch } from './etsy.js';
 import { reconcileStripe } from './stripe-orders.js';
+import { sendOutbox } from './outbox.js';
+import { buildStatus } from './status.js';
 import { systemsCheck } from './check.js';
 import { PREPAID_USD } from './claude.js';
 import { kvGet, kvSet } from './util.js';
@@ -13,11 +15,12 @@ import { startDailyOutreach, samplesStatus } from './outreach.js';
 export async function runScheduled(event, env) {
   await ensureSchema(env);
   const d = new Date(event.scheduledTime || Date.now());
-  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env)];
+  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env)];
   if (d.getUTCHours() === 10 && d.getUTCMinutes() < 30) jobs.push(startDailyOutreach(env, d));
   if (d.getUTCDay() === 1 && d.getUTCHours() === 8 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env));
   const results = await Promise.allSettled(jobs);
   for (const r of results) if (r.status === 'rejected') await logEvent(env, null, 'cron_error', String(r.reason?.message || r.reason));
+  try { await buildStatus(env); } catch (e) { await logEvent(env, null, 'cron_error', 'status: ' + e.message); }
 }
 
 async function checkShipping(env) {

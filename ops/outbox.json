@@ -1,0 +1,4 @@
+{
+  "_readme": "Emails queued by the growth agent (press, gift guides, partners). The worker sends unsent items on weekdays 09:00-17:00 UK, at most OUTBOX_PER_DAY a day, once per id (and never to an opted-out, bounced or suppressed address). Add items; never edit or reuse an id that has been sent. B2B/press addresses only, each must be published by the recipient; always include an opt-out line.",
+  "items": []
+}

@@ -320,12 +320,13 @@ async function handleGeneral(env, m) {
     messages: [{ role: 'user', content: `Email from ${m.name || ''} <${m.from}>, subject "${m.subject}":
 """${m.body}"""
 
-JSON only: {"intent": "enquiry" | "needs_decision" | "supplier_or_sales_pitch" | "spam" | "other", "reply": "reply to send for genuine customer or trade enquiries, else empty", "suggested_answer": "for needs_decision: what you would suggest Reece replies, else empty"}
+JSON only: {"intent": "enquiry" | "needs_decision" | "not_interested" | "supplier_or_sales_pitch" | "spam" | "other", "reply": "reply to send for genuine customer or trade enquiries, else empty", "suggested_answer": "for needs_decision: what you would suggest Reece replies, else empty"}
 "needs_decision" = anything the business facts and policies don't cover or that needs the owner: complaints asking for money or compensation, requests outside the policies, press or media, partnerships, wholesale or bulk deals, legal or data-protection requests, anything you're unsure of.` }],
   });
   const c = await parseJson(env, text);
   await logEvent(env, null, 'general_mail', { from: m.from, intent: c.intent });
   const reSubject = m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`;
+  if (c.intent === 'not_interested') { await kvSet(env, 'suppress_' + m.from.toLowerCase(), new Date().toISOString()); return; } // e.g. "no thanks" to a press pitch
   if (c.intent === 'needs_decision') return escalate(env, m, null, c.suggested_answer);
   if (c.intent === 'enquiry' && c.reply) await sendMail(env, { to: m.from, subject: reSubject, text: c.reply });
 }

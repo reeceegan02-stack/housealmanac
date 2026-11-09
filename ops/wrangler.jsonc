@@ -23,6 +23,7 @@
     "OUTREACH_WARMUP_PER_DAY": "10",
     "OUTREACH_PER_DAY": "20",
     "OUTREACH_PAUSED": "false",
+    "OUTBOX_PER_DAY": "15",
     "AGENT_LINK": "https://buy.stripe.com/00w14pgrf75m1p62GD2wU02"
   }
 }
