@@ -65,7 +65,11 @@ ${SCHEMA}`;
       ...base, toolChoice: { type: 'none' },
       messages: [...base.messages, { role: 'assistant', content: data.content }, { role: 'user', content: 'Now reply with only the final JSON object matching the schema, using what you found. Nothing else.' }],
     });
-    return validate(await parseJson(env, again));
+    try {
+      return validate(await parseJson(env, again));
+    } catch (e2) {
+      throw new Error(`Research gave no usable JSON (stop: ${data.stop_reason}; blocks: ${(data.content || []).map(c => c.type[0]).join('')}): ${String(text).slice(0, 160)} || retry: ${String(again).slice(0, 160)}`);
+    }
   }
 }
 

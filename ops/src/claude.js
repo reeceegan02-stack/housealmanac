@@ -46,22 +46,18 @@ export async function claude(env, { model = MODELS.research, system, messages, m
     if (r.ok) {
       const data = await r.json();
       await trackUsage(env, model, data.usage);
-      // Long web-search turns can pause; continue them (up to 3 times) so the answer is complete.
+      // Long web-search turns can pause; continue them (up to 3 times) and merge the parts, so the
+      // answer (which may span the pause) is complete.
       if (data.stop_reason === 'pause_turn' && _continues < 3) {
-        return claude(env, {
+        const cont = await claude(env, {
           model, system, maxTokens, tools, toolChoice, temperature,
           messages: [...messages, { role: 'assistant', content: data.content }],
           _continues: _continues + 1,
         });
+        const merged = { ...cont.data, content: [...(data.content || []), ...(cont.data.content || [])] };
+        return { text: textOf(merged.content), data: merged };
       }
-      // With web search the answer is split into citation blocks; keep only the text after the last
-      // search and join it without separators so JSON strings aren't broken.
-      const content = data.content || [];
-      let lastTool = -1;
-      content.forEach((c, i) => { if (c.type !== 'text') lastTool = i; });
-      const after = content.slice(lastTool + 1).filter(c => c.type === 'text').map(c => c.text).join('');
-      // If the JSON came before a final search, the text after it has no JSON: use all the text then.
-      const text = after.includes('{') ? after : content.filter(c => c.type === 'text').map(c => c.text).join('');
+      const text = textOf(data.content || []);
       return { text, data };
     }
     lastErr = `${r.status} ${await r.text()}`;
@@ -92,4 +88,13 @@ export async function parseJson(env, text) {
     });
     return extractJson(fixed);
   }
+}
+
+// With web search the answer is split into citation blocks: use the text after the last search, joined
+// without separators so JSON strings aren't broken; if the JSON came before a final search, use all text.
+function textOf(content) {
+  let lastTool = -1;
+  content.forEach((c, i) => { if (c.type !== 'text') lastTool = i; });
+  const after = content.slice(lastTool + 1).filter(c => c.type === 'text').map(c => c.text).join('');
+  return after.includes('{') ? after : content.filter(c => c.type === 'text').map(c => c.text).join('');
 }
