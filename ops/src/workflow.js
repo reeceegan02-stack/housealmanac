@@ -8,6 +8,7 @@ import { composeHtml } from './compose.js';
 import { todayTiles, renderPrint } from './render.js';
 import { sendMail, proofEmail, jpegAttachment } from './mail.js';
 import { claude, MODELS } from './claude.js';
+import { createPrintOrder } from './prodigi.js';
 
 const R = (limit, delay = '30 seconds') => ({ retries: { limit, delay, backoff: 'exponential' } });
 
@@ -70,6 +71,17 @@ export class OrderWorkflow extends WorkflowEntrypoint {
         });
       });
       return { status: 'needs_attention', qa };
+    }
+
+    if (order.source === 'etsy' && rev === 0) {
+      // Etsy buyers can't be emailed a proof, so print straight after the automatic check.
+      await step.do('print etsy order', R(3, '2 minutes'), async () => {
+        await updateOrder(env, order.id, { data_json: JSON.stringify(data), message, file_key: rendered.fileKey, proof_key: rendered.proofKey, status: 'approved' });
+        const po = await createPrintOrder(env, { ...order, revision: rev }, `${env.PUBLIC_BASE}/f/${rendered.fileKey}`);
+        await updateOrder(env, order.id, { status: 'printing', prodigi_id: po.id });
+        await logEvent(env, order.id, 'prodigi_order', { id: po.id, auto: 'etsy' });
+      });
+      return { status: 'printing', qa };
     }
 
     await step.do(`email proof v${rev}`, async () => {

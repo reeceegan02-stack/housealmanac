@@ -7,6 +7,7 @@ import { handleInbound } from './inbox.js';
 import { runScheduled, weeklySummary } from './cron.js';
 import { sendMail, orderReceivedEmail, approvedEmail } from './mail.js';
 import { createPrintOrder } from './prodigi.js';
+import { etsyConnect, etsyCallback, pollEtsy } from './etsy.js';
 
 export { OrderWorkflow };
 
@@ -26,6 +27,8 @@ export default {
       }
 
       if (p === '/stripe/webhook' && req.method === 'POST') return stripeWebhook(req, env, ctx);
+      if (p === '/etsy/connect') { await ensureSchema(env); return etsyConnect(env); }
+      if (p === '/etsy/callback') { await ensureSchema(env); return etsyCallback(env, url); }
 
       if (p.startsWith('/admin/')) {
         if (!env.ADMIN_KEY || req.headers.get('x-admin-key') !== env.ADMIN_KEY) return json({ error: 'forbidden' }, 403);
@@ -123,5 +126,6 @@ async function admin(req, env, url) {
   if (p === '/events') return json((await env.DB.prepare('SELECT * FROM events ORDER BY id DESC LIMIT ?').bind(Number(url.searchParams.get('limit') || 50)).all()).results);
   if (p === '/send' && req.method === 'POST') return json(await sendMail(env, body));
   if (p === '/summary' && req.method === 'POST') { await weeklySummary(env); return json({ ok: true }); }
+  if (p === '/etsy/poll' && req.method === 'POST') return json(await pollEtsy(env));
   return json({ error: 'unknown admin route' }, 404);
 }

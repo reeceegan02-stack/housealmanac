@@ -3,11 +3,12 @@ import { ensureSchema, updateOrder, logEvent, now, BRAND } from './util.js';
 import { getPrintOrder } from './prodigi.js';
 import { sendMail, shippedEmail } from './mail.js';
 import { startOrderWorkflow } from './orders.js';
+import { pollEtsy, etsyMarkShipped } from './etsy.js';
 
 export async function runScheduled(event, env) {
   await ensureSchema(env);
   const d = new Date(event.scheduledTime || Date.now());
-  const jobs = [checkShipping(env), retryStuck(env)];
+  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env)];
   if (d.getUTCHours() === 9 && d.getUTCMinutes() < 30) jobs.push(agentFollowUps(env));
   if (d.getUTCDay() === 1 && d.getUTCHours() === 8 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env));
   const results = await Promise.allSettled(jobs);
@@ -25,6 +26,7 @@ async function checkShipping(env) {
         await updateOrder(env, o.id, { status: 'shipped', tracking: JSON.stringify(tracking) });
         const to = o.source === 'agent-sample' ? (JSON.parse(o.ship_json || '{}').agent_email || o.email) : o.email;
         const t = shippedEmail(o, tracking);
+        if (o.source === 'etsy') await etsyMarkShipped(env, o, tracking);
         if (to) await sendMail(env, { to, subject: t.subject, text: t.text, orderId: o.id });
       } else if (po.status?.stage === 'Cancelled') {
         await updateOrder(env, o.id, { status: 'needs_attention', notes: 'Prodigi cancelled the order' });

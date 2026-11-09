@@ -51,8 +51,8 @@ We research your street and design a print that puts it in context:
 
 HOW IT WORKS
 1. Order and add the address, move-in year and message in the personalisation box.
-2. We research the street and email you a proof within 2 working days.
-3. Ask for changes, or approve it. We print it and it's delivered free in the UK.
+2. We research the street, design your print and check every detail.
+3. It's printed and dispatched within 3–5 working days, with free UK delivery. If we get a fact wrong, we reprint it free.
 
 THE DETAILS
 • A3 (29.7 × 42 cm), printed on 200gsm enhanced matte art paper

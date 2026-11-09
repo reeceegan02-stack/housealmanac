@@ -57,7 +57,9 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
   GET /admin/orders · GET /admin/order/:id · POST /admin/order/:id/restart · POST /admin/order/:id/approve · POST /admin/test-order
   · GET|POST /admin/prospects · GET /admin/events · POST /admin/send · POST /admin/summary
 - Secrets Reece adds once: ANTHROPIC_API_KEY, PRODIGI_API_KEY, STRIPE_SECRET_KEY (restricted), STRIPE_WEBHOOK_SECRET.
-- Not automated yet: Etsy orders (need Etsy API app) — check Etsy Orders in Chrome until then.
+- **Etsy**: once Reece registers an Etsy app (ETSY_KEYSTRING + ETSY_SHARED_SECRET secrets) and opens /etsy/connect once,
+  the cron pulls paid receipts → workflow → after the AI check it prints straight away (Etsy API can't message buyers, so no proof)
+  → tracking posted back to Etsy. Until connected, check Etsy Orders in Chrome.
 
 ## Manual fallback runbook (only if the automation is down)
 1. Stripe → Transactions for new paid orders. 2. Research the street (sources for every fact). 3. Build the print with `pipeline/` (render300.py, 3508x4961).
