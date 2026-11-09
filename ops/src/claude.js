@@ -32,7 +32,7 @@ export async function claude(env, { model = MODELS.research, system, messages, m
   if (tools) body.tools = tools;
   if (temperature !== undefined) body.temperature = temperature;
   let lastErr;
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 6; attempt++) {
     const r = await fetch(API, {
       method: 'POST',
       headers: {
@@ -64,7 +64,9 @@ export async function claude(env, { model = MODELS.research, system, messages, m
     }
     lastErr = `${r.status} ${await r.text()}`;
     if (r.status === 429 || r.status >= 500) {
-      await new Promise(res => setTimeout(res, 2000 * (attempt + 1)));
+      // Respect the rate-limit reset; outreach can run several research jobs close together.
+      const wait = Math.min(60, Number(r.headers.get('retry-after')) || 15 * (attempt + 1));
+      await new Promise(res => setTimeout(res, wait * 1000));
       continue;
     }
     break;

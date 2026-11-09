@@ -43,14 +43,16 @@ Historic map on the print: Ordnance Survey 25-inch, surveyed/revised roughly 189
 Customer's move-in year: ${ctx.moveIn || 'not given'}
 Customer's message (for context only, it is printed separately): ${ctx.message || 'none'}
 Land Registry sales on the street (other houses): ${salesSummary}
-
+${ctx.purpose === 'office' ? `
+This print is for an estate agency's own office at this address (${ctx.agency || 'the agency'}), not a family home. Write about the street, the building and the neighbourhood. There is no move-in year: make the final key timeline item about the street or area today. Subtitle: '<area> · <town>'. message_label: '<Street> · <town>'.
+` : ''}
 Schema:
 ${SCHEMA}`;
   const { text } = await claude(env, {
     model: MODELS.research,
     system: SYSTEM,
     maxTokens: 6000,
-    tools: [webSearchTool(10)],
+    tools: [webSearchTool(ctx.searches || 10)],
     messages: [{ role: 'user', content: prompt }],
   });
   return validate(extractJson(text));

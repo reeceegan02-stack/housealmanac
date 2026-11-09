@@ -59,8 +59,11 @@ const MIGRATIONS = [
   `ALTER TABLE prospects ADD COLUMN domain TEXT`,
   `ALTER TABLE prospects ADD COLUMN website TEXT`,
   `ALTER TABLE prospects ADD COLUMN created_at TEXT`,
+  `ALTER TABLE prospects ADD COLUMN office_json TEXT`,
   `UPDATE prospects SET domain = lower(substr(email, instr(email, '@') + 1)) WHERE domain IS NULL`,
   `CREATE INDEX IF NOT EXISTS prospects_status ON prospects (status)`,
+  // Agencies emailed before office previews (9 Nov 2026) were offered a free framed print for a buyer; keep that promise.
+  `UPDATE prospects SET office_json = json_set(coalesce(office_json, '{}'), '$.offer', 'buyer_sample') WHERE last_contact IS NOT NULL AND last_contact < '2026-11-09T16:00:00Z' AND json_extract(coalesce(office_json, '{}'), '$.offer') IS NULL`,
   `CREATE INDEX IF NOT EXISTS prospects_domain ON prospects (domain)`,
 ];
 

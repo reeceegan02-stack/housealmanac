@@ -9,6 +9,7 @@ import { todayTiles, renderPrint } from './render.js';
 import { sendMail, proofEmail, jpegAttachment } from './mail.js';
 import { claude, MODELS } from './claude.js';
 import { createPrintOrder } from './prodigi.js';
+import { sendPreviewEmail } from './outreach.js';
 
 const R = (limit, delay = '30 seconds') => ({ retries: { limit, delay, backoff: 'exponential' } });
 
@@ -45,7 +46,8 @@ export class OrderWorkflow extends WorkflowEntrypoint {
       data = JSON.parse(order.data_json);
     } else {
       data = await step.do('research', { ...R(2, '1 minute'), timeout: '20 minutes' }, async () => {
-        const d = await researchStreet(env, { ...geo, address: order.address, moveIn: order.move_in, message: order.message, sales });
+        const office = order.source === 'agent-preview' ? { purpose: 'office', agency: order.name, searches: 6 } : {};
+        const d = await researchStreet(env, { ...geo, address: order.address, moveIn: order.move_in, message: order.message, sales, ...office });
         await updateOrder(env, order.id, { data_json: JSON.stringify(d) });
         return d;
       });
@@ -72,6 +74,14 @@ export class OrderWorkflow extends WorkflowEntrypoint {
     });
     await logEvent(env, order.id, 'qa', { qa, rendered: { ...rendered, fileKey: undefined, proofKey: undefined }, layer: nls.layer });
 
+    if (!qa.ok && order.source === 'agent-preview' && rev === 0) {
+      // Outreach preview that didn't pass: send the plain introduction instead, no alert needed.
+      await step.do('preview failed, plain email', async () => {
+        await updateOrder(env, order.id, { status: 'cancelled', notes: 'Preview QA: ' + qa.blocking.join('; ') });
+        await sendPreviewEmail(env, order, null, null);
+      });
+      return { status: 'preview_plain', qa };
+    }
     if (!qa.ok) {
       await step.do(`flag v${rev}`, async () => {
         await updateOrder(env, order.id, { status: 'needs_attention', data_json: JSON.stringify(data), file_key: rendered.fileKey, proof_key: rendered.proofKey, notes: 'QA: ' + qa.blocking.join('; ') });
@@ -93,6 +103,15 @@ export class OrderWorkflow extends WorkflowEntrypoint {
         await logEvent(env, order.id, 'prodigi_order', { id: po.id, auto: 'etsy' });
       });
       return { status: 'printing', qa };
+    }
+
+    if (order.source === 'agent-preview' && rev === 0) {
+      await step.do('email office preview', async () => {
+        const proof = new Uint8Array(await env.FILES.get(rendered.proofKey, 'arrayBuffer'));
+        await updateOrder(env, order.id, { status: 'proof_sent', data_json: JSON.stringify(data), message, file_key: rendered.fileKey, proof_key: rendered.proofKey });
+        await sendPreviewEmail(env, order, geo.street || data.title, proof);
+      });
+      return { status: 'preview_sent', qa };
     }
 
     await step.do(`email proof v${rev}`, async () => {
@@ -141,6 +160,7 @@ Reply with JSON only: {"ok": true|false, "blocking_issues": ["..."], "minor_issu
 
 // Branding for estate-agent orders: their logo (if they've sent one) and a QR code to their reviews.
 async function agentInfo(env, order) {
+  if (order.source === 'agent-preview') return null; // the agency's own office print: no "with best wishes from" block
   const ship = JSON.parse(order.ship_json || '{}');
   let domain = ship.agent_domain || (order.source.startsWith('agent-') ? String(ship.agent_email || order.email || '').split('@')[1] : null);
   if (!domain && order.email) {

@@ -85,6 +85,50 @@ If this isn't for you, reply "no thanks" and I won't email again.`,
   };
 }
 
+const areaName = (p) => String(p.area || '').split(',')[0].trim() || 'your area';
+
+// First email with the agency's own office print attached (Reece's idea, 9 Nov 2026).
+export function officePreviewEmail(p, street, offerFree) {
+  return {
+    subject: `The history of ${street}, for ${p.agency}`,
+    text: `Hi ${p.agency} team,
+
+I run House Almanac, a Manchester business that makes framed A3 prints of a home's history. To show you what they look like, I made one for your office on ${street}. It's attached.
+
+Each print has the street on an 1890s Ordnance Survey map, the same spot today, a short history and timeline, and a personal message.
+
+${offerFree
+  ? `If you'd like it framed for the branch, just reply "yes" and I'll send it to you framed, free of charge.`
+  : `If you'd like it framed for the branch, it's £75 delivered. Just reply "yes".`}
+
+For your buyers, we make the same thing for their new home as a completion gift, with your logo and a QR code to your reviews: £75 each, or £65 each for 10 or more a quarter, no contract. Send me a buyer's new address and I'll email you a free proof first. Details: https://housealmanac.co.uk/agents
+
+Best wishes,
+Reece Egan-Sheath
+House Almanac · hello@housealmanac.co.uk · housealmanac.co.uk
+
+If this isn't for you, reply "no thanks" and I won't email again.`,
+  };
+}
+
+export function officeFollowUpEmail(p, street, offerFree) {
+  return {
+    subject: `Re: The history of ${street}, for ${p.agency}`,
+    text: `Hi ${p.agency} team,
+
+Just checking the print of ${street} reached you; it was attached to my last email. ${offerFree
+  ? `If you'd like it framed for the branch, reply "yes" and it's yours, free.`
+  : `If you'd like it framed for the branch, it's £75 delivered; reply "yes".`}
+
+And if you have a buyer completing soon, send me their new address and I'll email you a free proof of their print.
+
+Reece
+House Almanac · hello@housealmanac.co.uk
+
+If this isn't for you, reply "no thanks" and I won't email again.`,
+  };
+}
+
 // ---------- finding agencies ----------
 export async function findProspects(env, area) {
   const known = (await env.DB.prepare(`SELECT domain FROM prospects WHERE domain IS NOT NULL`).all()).results.map(r => r.domain);
@@ -98,7 +142,7 @@ For each one find, from their own website or its search snippets:
 Skip national corporate chains and their branches (e.g. Purplebricks, Connells, Your Move, Reeds Rains, Countrywide brands, haart, Foxtons, Savills, Knight Frank), lettings-only agents, and any agency where you can't find BOTH a published email and limited-company evidence.
 Skip these websites, we already know them: ${known.slice(-300).join(', ') || 'none'}.
 
-JSON only: {"agents": [{"agency": "the short trading name customers know, without branch, location or legal suffix (e.g. \"Julian Wadden\", not \"Julian Wadden & Co Limited (Didsbury)\")", "company": "registered name incl. Ltd/Limited/LLP", "company_no": "", "email": "", "website": "https://...", "evidence": "where you found the email and the company status"}]}` }],
+JSON only: {"agents": [{"agency": "the short trading name customers know, without branch, location or legal suffix (e.g. \"Julian Wadden\", not \"Julian Wadden & Co Limited (Didsbury)\")", "company": "registered name incl. Ltd/Limited/LLP", "company_no": "", "email": "", "website": "https://...", "office": {"line1": "street address of their branch in this area", "line2": "", "city": "", "postcode": ""}, "evidence": "where you found the email and the company status"}]}` }],
   });
   let list = [];
   try { list = extractJson(text).agents || []; } catch (e) { list = []; }
@@ -111,9 +155,10 @@ JSON only: {"agents": [{"agency": "the short trading name customers know, withou
     if (!ok || known.includes(domainOf(email))) { rejected++; continue; }
     const verified = await verifyOnWebsite(a.website, email);
     const status = verified ? 'new' : 'unverified';
-    const r = await env.DB.prepare(`INSERT INTO prospects (email, agency, company, area, status, domain, website, created_at, notes)
-      VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(email) DO NOTHING`)
-      .bind(email, a.agency, `${a.company}${a.company_no ? ` (${a.company_no})` : ''}`, area, status, domainOf(email), a.website || null, now(), String(a.evidence || '').slice(0, 300)).run();
+    const office = a.office && /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/i.test(a.office.postcode || '') && a.office.line1 ? a.office : null;
+    const r = await env.DB.prepare(`INSERT INTO prospects (email, agency, company, area, status, domain, website, created_at, notes, office_json)
+      VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(email) DO NOTHING`)
+      .bind(email, a.agency, `${a.company}${a.company_no ? ` (${a.company_no})` : ''}`, area, status, domainOf(email), a.website || null, now(), String(a.evidence || '').slice(0, 300), office ? JSON.stringify(office) : null).run();
     if (r.meta?.changes) { known.push(domainOf(email)); if (verified) added++; else rejected++; }
   }
   await logEvent(env, null, 'prospects_found', { area, found: list.length, added, rejected });
@@ -178,12 +223,53 @@ export async function sendFirstEmails(env, n) {
   return { sent, offerSample: s.left > 0 };
 }
 
+// One office-print order per prospect; the order workflow researches, renders, checks and then sends
+// the first email with the print attached. Prospects without a known office address get the plain email.
+export async function startPreview(env, p) {
+  const office = JSON.parse(p.office_json || 'null');
+  if (!office) {
+    const t = firstEmail(p, false);
+    await sendMail(env, { to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac' });
+    await env.DB.prepare(`UPDATE prospects SET status = 'emailed', last_contact = ?, followup_due = ? WHERE email = ?`).bind(now(), addDays(today(), 7), p.email).run();
+    return { plain: p.email };
+  }
+  const { createOrder } = await import('./orders.js');
+  const order = await createOrder(env, {
+    source: 'agent-preview', email: p.email, name: p.agency, product: 'framed', amount_pence: 0,
+    address: [office.line1, office.line2, office.city, office.postcode].filter(Boolean).join(', '),
+    message: `${p.agency}, proudly part of the story of ${areaName(p)}.`, move_in: '', style: 'heritage',
+    ship_json: JSON.stringify({ name: p.agency, line1: office.line1, line2: office.line2, city: office.city, postcode: office.postcode, agent_email: p.email, agent_domain: p.domain }),
+    external_ref: 'preview-' + p.email,
+  });
+  await env.DB.prepare(`UPDATE prospects SET status = 'preview_pending', last_contact = ?, office_json = ? WHERE email = ?`)
+    .bind(now(), JSON.stringify({ ...office, order_id: order.id }), p.email).run();
+  return { preview: order.id };
+}
+
+// Called by the order workflow once the office print passed its checks (or failed them).
+export async function sendPreviewEmail(env, order, street, proofBytes) {
+  const p = await env.DB.prepare('SELECT * FROM prospects WHERE email = ?').bind(order.email).first();
+  if (!p || ['opted_out', 'bounced'].includes(p.status)) return { skipped: true };
+  const s = await samplesStatus(env);
+  const office = JSON.parse(p.office_json || '{}');
+  const t = proofBytes ? officePreviewEmail(p, street, s.left > 0) : firstEmail(p, false);
+  const { jpegAttachment } = await import('./mail.js');
+  await sendMail(env, {
+    to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac', orderId: order.id,
+    attachments: proofBytes ? [jpegAttachment(proofBytes, `${street.replace(/[^A-Za-z0-9]+/g, '-')}-House-Almanac.jpg`)] : undefined,
+  });
+  await env.DB.prepare(`UPDATE prospects SET status = 'emailed', last_contact = ?, followup_due = ?, office_json = ? WHERE email = ?`)
+    .bind(now(), addDays(today(), 7), JSON.stringify({ ...office, street: proofBytes ? street : undefined }), p.email).run();
+  return { sent: true };
+}
+
 export async function sendFollowUps(env) {
   const s = await samplesStatus(env);
   const { results } = await env.DB.prepare(`SELECT * FROM prospects WHERE status = 'emailed' AND followup_due IS NOT NULL AND followup_due <= ? LIMIT 100`).bind(today()).all();
   let sent = 0;
   for (const p of results) {
-    const t = followUpEmail(p, s.left > 0);
+    const office = JSON.parse(p.office_json || '{}');
+    const t = office.street ? officeFollowUpEmail(p, office.street, s.left > 0) : followUpEmail(p, s.left > 0);
     try {
       await sendMail(env, { to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac' });
       await env.DB.prepare(`UPDATE prospects SET status = 'followed_up', last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), p.email).run();
@@ -203,10 +289,16 @@ export class OutreachWorkflow extends WorkflowEntrypoint {
       if (pool >= target) break;
       await step.do(`find ${i}`, R, async () => findProspects(env, await nextArea(env)));
     }
-    const first = await step.do('send first emails', () => sendFirstEmails(env, target));
     const follow = await step.do('send follow-ups', () => sendFollowUps(env));
-    await step.do('log', () => logEvent(env, null, 'outreach_day', { target, first, follow }));
-    return { target, first, follow };
+    const batch = await step.do('pick prospects', async () =>
+      (await env.DB.prepare(`SELECT * FROM prospects WHERE status = 'new' ORDER BY created_at LIMIT ?`).bind(target).all()).results);
+    const started = [];
+    for (let i = 0; i < batch.length; i++) {
+      started.push(await step.do(`preview ${i}`, { retries: { limit: 1, delay: '1 minute' } }, () => startPreview(env, batch[i])));
+      if (i < batch.length - 1) await step.sleep(`gap ${i}`, env.OUTREACH_GAP || '4 minutes');
+    }
+    await step.do('log', () => logEvent(env, null, 'outreach_day', { target, started: started.length, follow }));
+    return { target, started, follow };
   }
 }
 

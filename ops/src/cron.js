@@ -72,7 +72,8 @@ async function creditWatch(env) {
 
 export async function weeklySummary(env) {
   const since = new Date(Date.now() - 7 * 86400e3).toISOString();
-  const orders = await env.DB.prepare(`SELECT status, count(*) n, sum(amount_pence) p FROM orders WHERE created_at >= ? GROUP BY status`).bind(since).all();
+  const orders = await env.DB.prepare(`SELECT status, count(*) n, sum(amount_pence) p FROM orders WHERE created_at >= ? AND source NOT IN ('agent-preview','test') GROUP BY status`).bind(since).all();
+  const previews = (await env.DB.prepare(`SELECT count(*) n FROM orders WHERE created_at >= ? AND source IN ('agent-preview','agent-sample') AND amount_pence = 0`).bind(since).first()).n;
   const attention = await env.DB.prepare(`SELECT id, address, notes FROM orders WHERE status = 'needs_attention'`).all();
   const prospects = await env.DB.prepare(`SELECT status, count(*) n FROM prospects GROUP BY status`).all();
   const sentWeek = (await env.DB.prepare(`SELECT count(*) n FROM events WHERE kind = 'email_sent' AND at >= ? AND detail LIKE '%completion gift%'`).bind(since).first()).n;
@@ -87,7 +88,7 @@ export async function weeklySummary(env) {
 Orders: ${count} (£${(total / 100).toFixed(2)})
 ${orders.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}
 
-Estate agents (outreach emails this week: ${sentWeek}; free framed samples used ${samples.used} of ${samples.cap}):
+Estate agents (outreach emails this week: ${sentWeek}; office prints made: ${previews}; free framed samples used ${samples.used} of ${samples.cap}):
 ${prospects.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}
 
 Systems: ${sysLine}

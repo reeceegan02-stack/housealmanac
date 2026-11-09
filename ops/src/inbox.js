@@ -49,11 +49,12 @@ export async function handleInbound(message, env, ctx) {
   // 1. Customer order?
   const idMatch = subject.match(/\b(HA-[A-Z0-9]{6})\b/) || body.match(/\b(HA-[A-Z0-9]{6})\b/);
   let order = idMatch ? await getOrder(env, idMatch[1]) : null;
+  if (order && order.source === 'agent-preview') order = null; // office previews are handled with the agency's mail
   if (!order) {
-    order = await env.DB.prepare(`SELECT * FROM orders WHERE lower(email) = ? AND status NOT IN ('cancelled','delivered') ORDER BY created_at DESC LIMIT 1`).bind(from).first();
+    order = await env.DB.prepare(`SELECT * FROM orders WHERE lower(email) = ? AND source != 'agent-preview' AND status NOT IN ('cancelled','delivered') ORDER BY created_at DESC LIMIT 1`).bind(from).first();
   }
   if (!order) {
-    order = await env.DB.prepare(`SELECT * FROM orders WHERE source LIKE 'agent-%' AND lower(json_extract(ship_json,'$.agent_email')) = ? AND status NOT IN ('cancelled','delivered') ORDER BY created_at DESC LIMIT 1`).bind(from).first();
+    order = await env.DB.prepare(`SELECT * FROM orders WHERE source LIKE 'agent-%' AND source != 'agent-preview' AND lower(json_extract(ship_json,'$.agent_email')) = ? AND status NOT IN ('cancelled','delivered') ORDER BY created_at DESC LIMIT 1`).bind(from).first();
   }
   if (order) return handleOrderMail(env, order, { from, subject, body, attachments: mail.attachments || [] });
 
@@ -175,9 +176,14 @@ House Almanac`,
 async function handleAgentMail(env, prospect, m) {
   const { samplesStatus } = await import('./outreach.js');
   const samples = await samplesStatus(env);
-  const offer = samples.left > 0
-    ? `We offered this agency one free framed print for a buyer completing with them (${samples.left} free framed samples left in total).`
-    : `Free framed samples have all been claimed for now, so we offer a free digital proof for one of their buyers instead; the framed print is then £75 delivered to their branch. Don't offer a free framed print.`;
+  const domain0 = (prospect.domain || prospect.email.split('@')[1] || '').toLowerCase();
+  const preview = await env.DB.prepare(`SELECT * FROM orders WHERE source = 'agent-preview' AND lower(json_extract(ship_json,'$.agent_domain')) = ? AND status IN ('proof_sent','awaiting_payment','revising','needs_attention') ORDER BY created_at DESC LIMIT 1`).bind(domain0).first();
+  const legacy = !preview && JSON.parse(prospect.office_json || '{}').offer === 'buyer_sample'; // emailed before office previews: offered a free framed print for a buyer
+  const offer = preview
+    ? `Our first email attached a free digital House Almanac print of their own office street (${preview.address}). ${samples.left > 0 ? 'We offered to frame it and send it to their branch free of charge.' : 'Framed for their branch it is £75 delivered.'} For their buyers: they send a buyer's new address, we email a free proof, and the framed print is £75 delivered to their branch.`
+    : legacy && samples.left > 0
+      ? `We offered this agency one free framed print for a buyer completing with them (${samples.left} free framed samples left in total).`
+      : `For their buyers we offer a free digital proof; the framed print is then £75 delivered to their branch. Don't offer a free framed print.`;
   const { text } = await claude(env, {
     model: MODELS.research, maxTokens: 1500,
     system: `You handle email from estate agents for House Almanac, replying as Reece. Business facts:\n${KB}\n\n${offer} Be warm, brief, professional, British English, plain text. Never offer prices below £65 per print.`,
@@ -186,10 +192,12 @@ Email from ${m.from}, subject "${m.subject}", ${m.images.length} image attachmen
 """${m.body}"""
 
 JSON only:
-{"intent": "sample_with_details" | "interested" | "question" | "not_interested" | "other",
+{"intent": "office_print_yes" | "office_print_changes" | "sample_with_details" | "interested" | "question" | "not_interested" | "other",
+ "change_request": "for office_print_changes: the exact changes they want to their office print",
  "sample": {"buyer_new_address": "", "completion_date": "", "message_on_print": "", "branch_name": "", "branch_line1": "", "branch_line2": "", "branch_city": "", "branch_postcode": "", "review_url": ""},
  "reply": "reply to send; if they want the sample/proof but details are missing, ask for: buyer's new address, completion date, the message for the print (e.g. 'Welcome home, Sam & Alex, from everyone at <agency>'), the branch delivery address, and optionally their logo (attached) and a link to their Google reviews page for the QR code. Empty if not_interested."}
-"sample_with_details" needs at least the buyer's new address with postcode and the branch postcode.` }],
+"office_print_yes" = they want the framed print of their office (e.g. "yes", "yes please", "we'd love it"). "office_print_changes" = they want changes to the office print first.
+"sample_with_details" = they sent a buyer's new address with postcode and the branch postcode.` }],
   });
   const c = extractJson(text);
   await logEvent(env, null, 'agent_mail', { agency: prospect.agency, intent: c.intent });
@@ -203,8 +211,41 @@ JSON only:
   await saveAgentLogo(env, domain, m.images);
   if (s.review_url) await kvSet(env, 'review-' + domain, s.review_url);
 
+  const reSubject = m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`;
+  if (c.intent === 'office_print_yes' && preview && preview.file_key && ['proof_sent', 'needs_attention'].includes(preview.status)) {
+    if (samples.left > 0) {
+      await updateOrder(env, preview.id, { source: 'agent-sample', status: 'approved' });
+      try {
+        const po = await createPrintOrder(env, { ...preview, source: 'agent-sample' }, fileUrl(env, preview.file_key));
+        await updateOrder(env, preview.id, { status: 'printing', prodigi_id: po.id });
+        await logEvent(env, preview.id, 'prodigi_order', { id: po.id, office_sample: true });
+      } catch (e) {
+        await updateOrder(env, preview.id, { status: 'needs_attention', notes: 'Prodigi order failed: ' + e.message });
+        await alert(env, `Prodigi order failed for ${preview.id}`, e.message);
+      }
+      await env.DB.prepare(`UPDATE prospects SET status = 'sample_in_progress', samples_used = samples_used + 1, last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), prospect.email).run();
+      await sendMail(env, { to: m.from, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac', orderId: preview.id,
+        text: `Hi,\n\nLovely, it's gone to print. It will arrive at your branch framed and ready to hang in 3 to 5 working days, and I'll email you the tracking when it ships.\n\nWhen you have a buyer completing, just send me their new address and the message you'd like on it, and I'll email you a free proof of theirs.\n\nBest wishes,\nReece\nHouse Almanac` });
+    } else {
+      const link = `${env.AGENT_LINK}?client_reference_id=${preview.id}&prefilled_email=${encodeURIComponent(m.from)}`;
+      await updateOrder(env, preview.id, { status: 'awaiting_payment' });
+      await env.DB.prepare(`UPDATE prospects SET status = 'interested', last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), prospect.email).run();
+      await sendMail(env, { to: m.from, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac', orderId: preview.id,
+        text: `Hi,\n\nGreat. Framed and delivered to your branch it's £75, here (card, Apple Pay or Google Pay):\n${link}\n\nAs soon as it's paid it goes to print and arrives in 3 to 5 working days.\n\nBest wishes,\nReece\nHouse Almanac` });
+      await overCapAlert(env, prospect.agency);
+    }
+    return;
+  }
+  if (c.intent === 'office_print_changes' && preview && c.change_request) {
+    const rev = (preview.revision || 0) + 1;
+    await updateOrder(env, preview.id, { revision: rev, change_notes: c.change_request, status: 'revising', ship_json: JSON.stringify({ ...JSON.parse(preview.ship_json || '{}'), agent_email: m.from }) });
+    await startOrderWorkflow(env, preview.id, 'revise', rev);
+    await sendMail(env, { to: m.from, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac', text: `Hi,\n\nOf course. I'm making those changes now and will send you the updated version shortly.\n\nBest wishes,\nReece\nHouse Almanac` });
+    return;
+  }
+
   if (c.intent === 'sample_with_details' && s.buyer_new_address && s.branch_postcode) {
-    const free = samples.left > 0;
+    const free = legacy && samples.left > 0;
     const { createOrder } = await import('./orders.js');
     const order = await createOrder(env, {
       source: free ? 'agent-sample' : 'agent-proof', email: m.from, name: prospect.agency, product: 'framed', amount_pence: 0,

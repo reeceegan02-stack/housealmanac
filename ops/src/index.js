@@ -2,7 +2,7 @@
 import { OrderWorkflow } from './workflow.js';
 import { ingestStripeSession, reconcileStripe } from './stripe-orders.js';
 import { systemsCheck } from './check.js';
-import { OutreachWorkflow, startDailyOutreach, findProspects, samplesStatus } from './outreach.js';
+import { OutreachWorkflow, startDailyOutreach, findProspects, samplesStatus, startPreview } from './outreach.js';
 import { ensureSchema, json, getOrder, logEvent, updateOrder, now, fileUrl } from './util.js';
 import { verifyStripe, stripeGet, sessionToOrder } from './stripe.js';
 import { createOrder, startOrderWorkflow } from './orders.js';
@@ -134,5 +134,9 @@ async function admin(req, env, url) {
   if (p === '/outreach/run' && req.method === 'POST') return json(await startDailyOutreach(env, new Date()));
   if (p === '/outreach/find' && req.method === 'POST') return json(await findProspects(env, body.area));
   if (p === '/samples') return json(await samplesStatus(env));
+  if (p === '/outreach/preview' && req.method === 'POST') {
+    const pr = await env.DB.prepare('SELECT * FROM prospects WHERE email = ?').bind(String(body.email || '').toLowerCase()).first();
+    return pr ? json(await startPreview(env, pr)) : json({ error: 'no such prospect' }, 404);
+  }
   return json({ error: 'unknown admin route' }, 404);
 }

@@ -51,10 +51,13 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
   approve → Prodigi API order; changes → revised proof; cancel before approval → Stripe refund; damaged with photo → free replacement;
   agent replies → answered, free-sample orders created (cap 5), "no thanks" → opted out; general enquiries → answered.
 - **Agent growth engine** (`ops/src/outreach.js`, Workflow `housealmanac-outreach`): weekdays 10:00 UTC the cron starts the day's run:
-  Claude web search finds estate agents area by area (AREAS list: Greater Manchester first, then North West, Yorkshire, UK) → only Ltd/LLP,
-  published email that is verified on their own website (PECR) → emails OUTREACH_WARMUP_PER_DAY (10) for the first week, then OUTREACH_PER_DAY (20)
-  → follow-up after 7 days → replies handled by the inbox. Bounces mark prospects 'bounced'. Pause: set var OUTREACH_PAUSED=true.
-  Reece wants volume ("the faster you get out there the better"); ramp gradually to protect hello@ deliverability (proofs use the same domain).
+  Claude web search finds estate agents area by area (AREAS: Greater Manchester first, then North West, Yorkshire, UK) → only Ltd/LLP with a
+  published email verified on their own website (PECR) → follow-ups for anyone due → for each new agency (10/day week one, then 20/day,
+  4 minutes apart) an **office preview**: an agent-preview order for their own office address goes through the normal pipeline (6 web searches)
+  and the first email ("The history of <street>, for <agency>") carries that print as a JPG (Reece's idea, 9 Nov). No office address or failed
+  check → plain intro email. Follow-up after 7 days. Reply "yes" → framed office print (free while samples last, else £75 link). Buyer prints:
+  free digital proof → £75. Bounces → 'bounced'. Pause: var OUTREACH_PAUSED=true. ~25p AI cost per agency.
+  Agencies emailed before 16:00 9 Nov were offered a free framed print for a buyer (office_json.offer = buyer_sample): honour it.
 - **Free framed samples** (Reece, 9 Nov): 5, plus 1 more per agency that becomes a paying customer (`samplesStatus`). When none are left, agents get
   a free digital proof (source agent-proof); on approval they get the £75 agent link with ?client_reference_id=HA-…, and payment prints it.
   After every 3 over-cap sample requests hello@ gets a "Decision" email; Reece may approve more (raise FREE_SAMPLES_CAP).
@@ -65,6 +68,7 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **Admin API** (header `x-admin-key` = Worker secret ADMIN_KEY; not stored anywhere — rotate it in Worker settings if you need access):
   GET /admin/orders · GET /admin/order/:id · POST /admin/order/:id/restart · POST /admin/order/:id/approve · POST /admin/test-order
   · GET|POST /admin/prospects · GET /admin/events · POST /admin/send · POST /admin/summary · POST /admin/order/:id/set (fields) · POST /admin/stripe/reconcile · POST /admin/etsy/poll
+  · POST /admin/outreach/run · POST /admin/outreach/find {area} · POST /admin/outreach/preview {email} · GET /admin/samples · GET /admin/check
   A restarted order reuses its saved research (data_json); set data_json to null first to force fresh research.
 - Claude API: Reece's Console org, $100 free credit until 24 Nov 2026, then $20 prepaid (bought 9 Nov, auto-reload OFF by Reece's choice).
   ~$0.30 per order. The worker estimates usage (kv claude_usd_*) and emails hello@ when under ~$5 is left; top-ups need Reece's yes.
