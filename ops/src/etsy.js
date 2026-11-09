@@ -119,3 +119,28 @@ export async function etsyMarkShipped(env, order, tracking) {
   });
   await logEvent(env, order.id, 'etsy_marked_shipped', tracking);
 }
+
+// While the app is pending Etsy's review: ping the API each cron run and, the first time the key
+// works, email hello@ the two remaining steps (callback URL + one-click connect).
+export async function etsyApprovalWatch(env) {
+  if (!env.ETSY_KEYSTRING || await kvGet(env, 'etsy_tokens') || await kvGet(env, 'etsy_approved_notified')) return { skipped: true };
+  const r = await fetch(`${API}/openapi-ping`, { headers: { 'x-api-key': apiKeyHeader(env) }, signal: AbortSignal.timeout(15000) });
+  if (!r.ok) return { pending: r.status };
+  await kvSet(env, 'etsy_approved_notified', now());
+  const { sendMail } = await import('./mail.js');
+  const { BRAND } = await import('./util.js');
+  await sendMail(env, {
+    to: BRAND.from, bcc: false, subject: 'ACTION NEEDED (2 minutes): Etsy approved the House Almanac app',
+    text: `Etsy has approved the API key, so Etsy orders can now print automatically. Two quick steps:
+
+1. etsy.com/developers → house-almanac-orders → edit → add this Callback URL and save:
+   ${redirectUri(env)}
+
+2. Open this link while signed in to Etsy and click "Allow access":
+   ${env.PUBLIC_BASE}/etsy/connect
+
+Or just tell Claude "Etsy is approved" and it will do step 1 for you.`,
+  });
+  await logEvent(env, null, 'etsy_key_active', {});
+  return { notified: true };
+}

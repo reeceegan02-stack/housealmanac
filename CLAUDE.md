@@ -35,12 +35,10 @@ Christmas: last order date 9 December.
 - Printing: Prodigi dashboard (dashboard.prodigi.com), card on file. Upload the print JPG (3508×4961, 300 dpi).
 - Domain/DNS/email routing: Cloudflare account reeceegan02@gmail.com.
 - Old worker `housealmanac-site` is retired (no domains); can be deleted.
-- **Sending email**: Cloudflare Email Service (Workers Paid, $5/mo) via Worker `housealmanac-mail` (POST JSON, header `x-key` must equal the Worker secret MAIL_KEY).
-  The key is NOT stored anywhere. Each session: generate a random key, set it in Cloudflare → Workers → housealmanac-mail → Settings → Variables and secrets → MAIL_KEY (Edit), then
-  in Chrome open https://housealmanac-mail.reeceegan02.workers.dev/ and run (same origin):
-  `await fetch('/',{method:'POST',headers:{'content-type':'application/json','x-key':KEY},body:JSON.stringify({to,subject,text,html,bcc:'hello@housealmanac.co.uk',fromName:'Reece Egan-Sheath | House Almanac'})})`
-  Always BCC hello@ so there's a copy in the inbox. Fields: to, subject, text, html, cc, bcc, attachments [{content(base64),filename,type,disposition}].
-  Replies arrive at hello@ → reeceegan02@gmail.com; read them in Chrome Gmail (search `to:hello@housealmanac.co.uk`). Only read House Almanac mail there.
+- **Sending email**: the ops worker sends from hello@ (Cloudflare Email Service, Workers Paid $5/mo). For a one-off email, POST /admin/send
+  on housealmanac-ops (fields: to, subject, text, html, cc, bcc, attachments, fromName; BCC to hello@ by default). The old `housealmanac-mail`
+  worker is no longer used.
+  Replies arrive at hello@ → ops worker (acts on them) → copy in reeceegan02@gmail.com; read in Chrome Gmail (`to:hello@housealmanac.co.uk`) only if needed.
 - Etsy shop: HouseAlmanac (Reece's Etsy account, signed in in Chrome). Listing copy in `marketing/etsy_listing.md`.
 
 ## Automation (runs 24/7 in Cloudflare, no laptop needed)
@@ -64,9 +62,11 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
   live as **Build** secrets on housealmanac-ops (Settings → Build → Variables and secrets). Each Workers Build copies them into runtime
   secrets (`ops/scripts/sync-secrets.mjs`, run by wrangler's custom build). To rotate: change the build secret, then retry the build.
   `/health` shows true/false for each key (never the values).
-- **Etsy**: once Reece registers an Etsy app (ETSY_KEYSTRING + ETSY_SHARED_SECRET secrets) and opens /etsy/connect once,
-  the cron pulls paid receipts → workflow → after the AI check it prints straight away (Etsy API can't message buyers, so no proof)
-  → tracking posted back to Etsy. Until connected, check Etsy Orders in Chrome.
+- **Etsy**: app "house-almanac-orders" registered 9 Nov 2026 (Pending Personal Approval). The cron pings the API every 30 min; when the key goes
+  live it emails hello@ the last two steps (add callback URL https://housealmanac-ops.reeceegan02.workers.dev/etsy/callback in the app, then
+  Reece opens /etsy/connect and clicks Allow). Reece must paste ETSY_KEYSTRING + ETSY_SHARED_SECRET as Build secrets (never enter keys yourself).
+  Once connected: cron pulls paid receipts → workflow → prints straight after the AI check (no proof; Etsy API can't message buyers) → tracking to Etsy.
+  Stopgap until then: Reece forwards Etsy's "You made a sale" email to hello@ and the inbox creates the order (external_ref etsy-<receipt>, so no duplicates later).
 
 ## Manual fallback runbook (only if the automation is down)
 1. Stripe → Transactions for new paid orders. 2. Research the street (sources for every fact). 3. Build the print with `pipeline/` (render300.py, 3508x4961).

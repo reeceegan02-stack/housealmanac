@@ -36,6 +36,12 @@ export async function handleInbound(message, env, ctx) {
 
   await logEvent(env, null, 'inbox', { from, subject, chars: body.length, forwarded });
 
+  // 0. Reece forwarding an Etsy "You made a sale" email (stopgap until the Etsy API is connected).
+  const fullText = (mail.text || htmlToText(mail.html || '')).slice(0, 20000);
+  if (env.FORWARD_TO && from === env.FORWARD_TO.toLowerCase() && /etsy/i.test(fullText) && /(made a sale|order number|order #|receipt|transaction)/i.test(fullText)) {
+    return handleEtsyForward(env, fullText, subject);
+  }
+
   // 1. Customer order?
   const idMatch = subject.match(/\b(HA-[A-Z0-9]{6})\b/) || body.match(/\b(HA-[A-Z0-9]{6})\b/);
   let order = idMatch ? await getOrder(env, idMatch[1]) : null;
@@ -173,6 +179,42 @@ JSON only: {"intent": "enquiry" | "supplier_or_sales_pitch" | "spam" | "other", 
   const c = extractJson(text);
   await logEvent(env, null, 'general_mail', { from: m.from, intent: c.intent });
   if (c.intent === 'enquiry' && c.reply) await sendMail(env, { to: m.from, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, text: c.reply });
+}
+
+async function handleEtsyForward(env, text, subject) {
+  const { text: out } = await claude(env, {
+    model: MODELS.research, maxTokens: 1200,
+    messages: [{ role: 'user', content: `This is an Etsy sale notification for our shop, forwarded by the shop owner. Extract the order.
+"""${text}"""
+
+JSON only:
+{"is_etsy_sale": true|false, "receipt_id": "Etsy order/receipt number, digits only", "buyer_name": "", "buyer_email": "",
+ "ship": {"name": "", "line1": "", "line2": "", "city": "", "county": "", "postcode": "", "country": "GB"},
+ "print_address": "the home address the buyer wants the print made for (from the personalisation if given, else the shipping address), incl. postcode",
+ "message": "the message for the print from the personalisation, else empty",
+ "style": "heritage|modern|midnight|sage (default heritage)", "framed": true|false, "total_gbp": 0}` }],
+  });
+  const o = extractJson(out);
+  const receipt = String(o.receipt_id || '').replace(/\D/g, '');
+  if (!o.is_etsy_sale || !receipt || !(o.ship?.postcode || o.print_address)) {
+    return alert(env, 'forwarded Etsy email could not be read', `Subject: ${subject}\n\nCheck the order in Etsy and create it with /admin/test-order (source etsy) if needed.`);
+  }
+  const ship = o.ship || {};
+  const { createOrder } = await import('./orders.js');
+  const order = await createOrder(env, {
+    source: 'etsy', external_ref: 'etsy-' + receipt, email: o.buyer_email || null, name: o.buyer_name || ship.name,
+    product: o.framed === false ? 'unframed' : 'framed', amount_pence: Math.round((Number(o.total_gbp) || 0) * 100),
+    address: o.print_address || [ship.line1, ship.line2, ship.city, ship.postcode].filter(Boolean).join(', '),
+    message: o.message || '', move_in: (o.message || '').match(/\b(19|20)\d{2}\b/)?.[0] || '', style: String(o.style || 'heritage').toLowerCase(),
+    ship_json: JSON.stringify({ ...ship, etsy_receipt: receipt }),
+  });
+  await logEvent(env, order.id, 'etsy_forward', { receipt, isNew: order.isNew });
+  if (order.isNew) {
+    await sendMail(env, {
+      to: BRAND.from, bcc: false, subject: `Etsy order ${receipt} received (${order.id})`,
+      text: `Got it. Etsy order ${receipt} for ${order.address} is now order ${order.id}. It will be researched, checked and sent to print automatically. When the "on its way" email with tracking arrives, mark the order as dispatched in Etsy (this becomes automatic once the Etsy API is connected).`,
+    });
+  }
 }
 
 async function totalSamples(env) {
