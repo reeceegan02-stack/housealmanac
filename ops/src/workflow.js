@@ -2,7 +2,7 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { NonRetryableError } from 'cloudflare:workflows';
 import { ensureSchema, getOrder, updateOrder, logEvent, randomKey, bytesToBase64, extractJson, BRAND, kvGet } from './util.js';
-import { geocode, streetGeometry, pickNlsLayer, streetSales } from './geo.js';
+import { geocode, streetGeometry, pickNlsLayer, streetSales, nlsCandidates } from './geo.js';
 import { researchStreet, reviseContent } from './research.js';
 import { composeHtml } from './compose.js';
 import { todayTiles, renderPrint } from './render.js';
@@ -58,7 +58,7 @@ export class OrderWorkflow extends WorkflowEntrypoint {
     const rendered = await step.do(`render v${rev}`, { ...R(2, '1 minute'), timeout: '10 minutes' }, async () => {
       const today = await todayTiles(geo, lines);
       const agent = await agentInfo(env, order);
-      const html = composeHtml({ data, geo, lines, histLayer: nls.layer, todayTiles: today, sales, style: order.style, message, agent });
+      const html = composeHtml({ data, geo, lines, histLayer: nls.layer, histAlts: nlsCandidates(geo), todayTiles: today, sales, style: order.style, message, agent });
       const r = await renderPrint(env, html);
       const fileKey = `print-${order.id}-v${rev}-${randomKey(10)}.jpg`;
       const proofKey = `proof-${order.id}-v${rev}-${randomKey(10)}.jpg`;

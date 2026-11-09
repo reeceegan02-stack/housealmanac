@@ -86,7 +86,10 @@ export function frameMap({ lat, lon, lines, boxW, boxH, devicePx, maxZoom, minSp
 }
 
 // HTML for a tile mosaic covering a box. urlFor(z,x,y) -> src.
-export function tileLayer({ lat, lon, z, scale, boxW, boxH, urlFor, filter }) {
+// A tile that fails (e.g. at a county-sheet boundary) tries the alternative layers in turn, then hides.
+const TILE_ONERROR = "var a=(this.dataset.alts||'').split('|').filter(Boolean);if(a.length){this.dataset.alts=a.slice(1).join('|');this.src=a[0];}else{this.onerror=null;this.style.visibility='hidden';}";
+
+export function tileLayer({ lat, lon, z, scale, boxW, boxH, urlFor, filter, altUrls }) {
   const [cx, cy] = project(lat, lon, z);
   const halfW = boxW / 2 / scale, halfH = boxH / 2 / scale;
   const x0 = Math.floor((cx - halfW) / 256), x1 = Math.floor((cx + halfW) / 256);
@@ -97,7 +100,8 @@ export function tileLayer({ lat, lon, z, scale, boxW, boxH, urlFor, filter }) {
     for (let ty = y0; ty <= y1; ty++) {
       const left = (tx * 256 - cx) * scale + boxW / 2;
       const top = (ty * 256 - cy) * scale + boxH / 2;
-      imgs.push(`<img src="${urlFor(z, tx, ty)}" style="position:absolute;left:${left.toFixed(2)}px;top:${top.toFixed(2)}px;width:${(size + 0.6).toFixed(2)}px;height:${(size + 0.6).toFixed(2)}px" alt="">`);
+      const alts = altUrls ? altUrls(z, tx, ty).join('|') : '';
+      imgs.push(`<img src="${urlFor(z, tx, ty)}"${alts ? ` data-alts="${alts}" onerror="${TILE_ONERROR}"` : ''} style="position:absolute;left:${left.toFixed(2)}px;top:${top.toFixed(2)}px;width:${(size + 0.6).toFixed(2)}px;height:${(size + 0.6).toFixed(2)}px" alt="">`);
     }
   }
   return `<div class="tiles" style="position:absolute;inset:0;filter:${filter}">${imgs.join('')}</div>`;
@@ -140,7 +144,7 @@ export function salesStrip(sales, nowYear = new Date().getFullYear()) {
   const X = (yr) => 30 + (yr - y0) / (y1 - y0) * 600;
   const lp = clean.map(s => Math.log(s.price));
   const lmin = Math.min(...lp), lmax = Math.max(...lp);
-  const Y = (p) => 84 - (Math.log(p) - lmin) / Math.max(0.01, lmax - lmin) * 68;
+  const Y = (p) => 90 - (Math.log(p) - lmin) / Math.max(0.01, lmax - lmin) * 58;
   const ticks = [];
   for (let t = Math.ceil(y0 / 10) * 10; t <= y1; t += 10) ticks.push(t);
   const med = (arr) => { const a = arr.map(s => s.price).sort((p, q) => p - q); return a[Math.floor(a.length / 2)]; };
@@ -149,13 +153,14 @@ export function salesStrip(sales, nowYear = new Date().getFullYear()) {
   const fmt = (p) => '£' + (Math.round(p / 1000) * 1000).toLocaleString('en-GB');
   const eY0 = Math.floor(early[0].year), eY1 = Math.floor(early[early.length - 1].year);
   const lY0 = Math.floor(late[0].year), lY1 = Math.floor(late[late.length - 1].year);
-  const svg = `<svg viewBox="0 0 640 110" style="width:128mm;height:22mm" aria-label="Recorded sale prices on the street">
-    <line x1="30" y1="92" x2="630" y2="92" class="axis" stroke-width="1.6"/>
-    <g font-family="Inter, sans-serif" font-size="13" class="softf">${ticks.map(t => `<text x="${X(t).toFixed(1)}" y="108" text-anchor="middle">${t}</text>`).join('')}</g>
+  // Labels sit in their own row above the dots so they never collide with them.
+  const svg = `<svg viewBox="0 0 640 116" style="width:128mm;height:23.2mm" aria-label="Recorded sale prices on the street">
+    <line x1="30" y1="98" x2="630" y2="98" class="axis" stroke-width="1.6"/>
+    <g font-family="Inter, sans-serif" font-size="13" class="softf">${ticks.map(t => `<text x="${X(t).toFixed(1)}" y="114" text-anchor="middle">${t}</text>`).join('')}</g>
     <g class="dots">${clean.map(s => `<circle cx="${X(s.year).toFixed(1)}" cy="${Y(s.price).toFixed(1)}" r="4.4"/>`).join('')}</g>
     <g font-family="Inter, sans-serif" font-size="13" class="inkf" font-weight="600">
-      <text x="34" y="14">Typical sale ${eY0}${eY1 > eY0 ? '–' + eY1 : ''}: ${fmt(med(early))}</text>
-      <text x="630" y="${Math.min(84, Y(med(late)) + 30).toFixed(0)}" text-anchor="end">${lY0}${lY1 > lY0 ? '–' + lY1 : ''}: ${fmt(med(late))}</text>
+      <text x="30" y="14">Typical sale ${eY0}${eY1 > eY0 ? '–' + eY1 : ''}: ${fmt(med(early))}</text>
+      <text x="630" y="14" text-anchor="end">Typical sale ${lY0}${lY1 > lY0 ? '–' + lY1 : ''}: ${fmt(med(late))}</text>
     </g></svg>`;
   return { svg, caption: `${clean.length} recorded sales. House numbers and this home's own sales are left off.`, n: clean.length, from: y0 };
 }
@@ -184,7 +189,7 @@ function agentBlock(agent) {
     <div style="display:flex;flex-direction:column;align-items:center;gap:1mm;max-width:32mm"><div class="src" style="font-size:5.5pt">With best wishes from</div>${logo}</div>${qr}</div>`;
 }
 
-export function composeHtml({ data, geo, lines, histLayer, todayTiles, sales, style, message, fontScale = 1, agent = null }) {
+export function composeHtml({ data, geo, lines, histLayer, histAlts = [], todayTiles, sales, style, message, fontScale = 1, agent = null }) {
   const theme = THEMES[normaliseStyle(style)];
   const heroBox = { w: 265 * MM, h: 178.2 * MM };
   const todayBox = { w: 128 * MM, h: 85.3 * MM };
@@ -194,7 +199,8 @@ export function composeHtml({ data, geo, lines, histLayer, todayTiles, sales, st
   const today = todayTiles.frame;
 
   const heroTiles = histLayer
-    ? tileLayer({ ...hero, boxW: heroBox.w, boxH: heroBox.h, urlFor: (z, x, y) => nlsTileUrl(histLayer, z, x, y), filter: theme.histFilter })
+    ? tileLayer({ ...hero, boxW: heroBox.w, boxH: heroBox.h, urlFor: (z, x, y) => nlsTileUrl(histLayer, z, x, y), filter: theme.histFilter,
+        altUrls: (z, x, y) => histAlts.filter(l => l !== histLayer).map(l => nlsTileUrl(l, z, x, y)) })
     : '';
   const todayLayer = tileLayer({ ...today, boxW: todayBox.w, boxH: todayBox.h, urlFor: (z, x, y) => todayTiles.src[`${z}/${x}/${y}`] || '', filter: theme.todayFilter });
 
