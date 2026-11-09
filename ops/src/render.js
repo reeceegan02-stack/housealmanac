@@ -29,8 +29,14 @@ export async function renderPrint(env, html) {
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: W, height: H, deviceScaleFactor: 3508 / W });
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 120000 });
-    await page.evaluate(() => document.fonts.ready);
+    // Don't let one hung map tile block the render: wait for images up to a limit, then carry on.
+    // The check step counts any tiles that never loaded and holds the print back if too many are missing.
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    try {
+      await page.waitForFunction(() => [...document.images].every((i) => i.complete), { timeout: 100000, polling: 1000 });
+    } catch (e) { /* proceed with what loaded */ }
+    await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 15000))]));
+    await new Promise((r) => setTimeout(r, 500));
     const fit = await page.evaluate(() => window.__fit());
     const images = await page.evaluate(() => {
       const imgs = [...document.images];
