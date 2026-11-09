@@ -1,4 +1,22 @@
 // Minimal Anthropic Messages API client.
+import { kvGet, kvSet } from './util.js';
+
+// Rough cost tracking so we can warn before prepaid credit runs out (the API has no balance endpoint).
+// Prices are estimates per million tokens; web search is $10 per 1,000 searches.
+const PRICE = { 'claude-sonnet-5-5': [3, 15], 'claude-haiku-5-5': [1, 5] };
+export const PROMO_ENDS = '2026-11-24'; // free credit covers usage until then
+export const PREPAID_USD = 20;          // bought 9 Nov 2026
+
+async function trackUsage(env, model, u = {}) {
+  try {
+    const [pin, pout] = PRICE[model] || [3, 15];
+    const usd = ((u.input_tokens || 0) + (u.cache_creation_input_tokens || 0)) * pin / 1e6 + (u.cache_read_input_tokens || 0) * pin * 0.1 / 1e6
+      + (u.output_tokens || 0) * pout / 1e6 + (u.server_tool_use?.web_search_requests || 0) * 0.01;
+    const key = new Date().toISOString().slice(0, 10) >= PROMO_ENDS ? 'claude_usd_paid' : 'claude_usd_promo';
+    const prev = Number(await kvGet(env, key) || 0);
+    await kvSet(env, key, String(prev + usd));
+  } catch (e) { /* never block on tracking */ }
+}
 
 const API = 'https://api.anthropic.com/v1/messages';
 
@@ -26,6 +44,7 @@ export async function claude(env, { model = MODELS.research, system, messages, m
     });
     if (r.ok) {
       const data = await r.json();
+      await trackUsage(env, model, data.usage);
       // Long web-search turns can pause; continue them (up to 3 times) so the answer is complete.
       if (data.stop_reason === 'pause_turn' && _continues < 3) {
         return claude(env, {

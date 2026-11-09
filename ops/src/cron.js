@@ -6,11 +6,13 @@ import { startOrderWorkflow } from './orders.js';
 import { pollEtsy, etsyMarkShipped } from './etsy.js';
 import { reconcileStripe } from './stripe-orders.js';
 import { systemsCheck } from './check.js';
+import { PREPAID_USD } from './claude.js';
+import { kvGet, kvSet } from './util.js';
 
 export async function runScheduled(event, env) {
   await ensureSchema(env);
   const d = new Date(event.scheduledTime || Date.now());
-  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env)];
+  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env)];
   if (d.getUTCHours() === 9 && d.getUTCMinutes() < 30) jobs.push(agentFollowUps(env));
   if (d.getUTCDay() === 1 && d.getUTCHours() === 8 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env));
   const results = await Promise.allSettled(jobs);
@@ -56,6 +58,17 @@ async function retryStuck(env) {
   }
 }
 
+// Warn once when the prepaid Claude credit is estimated to be under $5.
+async function creditWatch(env) {
+  const used = Number(await kvGet(env, 'claude_usd_paid') || 0);
+  if (PREPAID_USD - used > 5 || await kvGet(env, 'claude_credit_warned')) return;
+  await kvSet(env, 'claude_credit_warned', new Date().toISOString());
+  await sendMail(env, {
+    to: BRAND.from, bcc: false, subject: 'ACTION NEEDED: Claude API credit is nearly used up',
+    text: `By our estimate about $${used.toFixed(2)} of the $${PREPAID_USD} prepaid Claude API credit has been used. When it runs out, new orders stop at the research step.\n\nTop up at platform.claude.com → Billing & payments → Buy credits (or turn on auto-reload).`,
+  });
+}
+
 async function agentFollowUps(env) {
   const today = new Date().toISOString().slice(0, 10);
   const { results } = await env.DB.prepare(`SELECT * FROM prospects WHERE status = 'emailed' AND followup_due IS NOT NULL AND followup_due <= ?`).bind(today).all();
@@ -85,6 +98,7 @@ export async function weeklySummary(env) {
   const attention = await env.DB.prepare(`SELECT id, address, notes FROM orders WHERE status = 'needs_attention'`).all();
   const prospects = await env.DB.prepare(`SELECT status, count(*) n FROM prospects GROUP BY status`).all();
   const sys = await systemsCheck(env);
+  const promoUsd = Number(await kvGet(env, 'claude_usd_promo') || 0), paidUsd = Number(await kvGet(env, 'claude_usd_paid') || 0);
   const sysLine = ['prodigi', 'stripe', 'claude'].map((k) => `${k} ${sys[k].ok ? 'OK' : 'FAILING: ' + sys[k].error}`).join(' · ') + ` · etsy ${sys.etsy?.connected ? 'connected' : 'not connected'}`;
   const total = orders.results.reduce((a, r) => a + (r.p || 0), 0);
   const count = orders.results.reduce((a, r) => a + r.n, 0);
@@ -97,6 +111,7 @@ Estate agents:
 ${prospects.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}
 
 Systems: ${sysLine}
+Claude API (estimate): $${promoUsd.toFixed(2)} on free credit, $${paidUsd.toFixed(2)} of $${PREPAID_USD} prepaid used
 
 Needs attention: ${attention.results.length ? '\n' + attention.results.map(a => `- ${a.id} ${a.address}: ${a.notes || ''}`).join('\n') : 'nothing'}
 

@@ -2,3 +2,4 @@ date,type,supplier,description,amount_gbp,notes
 2026-11-08,cost,Cloudflare,housealmanac.co.uk domain registration (1 year),4.10,Charged as USD 5.30; date and GBP figure approximate - check against the card statement
 2026-11-09,cost,Prodigi,Test print: unframed A3 (order 14748039),15.48,£7.00 print + £5.90 delivery + £2.58 VAT; ref HA-TEST-001
 2026-11-09,cost,Cloudflare,Workers Paid plan (email sending) - monthly,3.90,USD 5.00/month recurring; GBP approximate
+2026-11-09,cost,Anthropic,Claude API prepaid credit ($20 + $4 VAT; one-off; powers street research),18.60,Charged as USD 24.00 on Visa ending 5781; GBP approximate - check against the card statement. Free $100 promo credit runs to 24 Nov
