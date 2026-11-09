@@ -1,5 +1,5 @@
 // Minimal Anthropic Messages API client.
-import { kvGet, kvSet } from './util.js';
+import { kvGet, kvSet, extractJson } from './util.js';
 
 // Rough cost tracking so we can warn before prepaid credit runs out (the API has no balance endpoint).
 // Prices are estimates per million tokens; web search is $10 per 1,000 searches.
@@ -80,3 +80,14 @@ export const webSearchTool = (maxUses = 8) => ({
   max_uses: maxUses,
   user_location: { type: 'approximate', country: 'GB' },
 });
+
+// Parse a model's JSON reply; if it's malformed (e.g. a stray double quote), have a fast model repair it.
+export async function parseJson(env, text) {
+  try { return extractJson(text); } catch (e) {
+    const { text: fixed } = await claude(env, {
+      model: MODELS.fast, maxTokens: 6000,
+      messages: [{ role: 'user', content: `This should be one JSON object but it is not valid JSON (${e.message}). Fix only the syntax (escape or replace stray double quotes inside strings, add missing commas). Don't change any wording. Return only the JSON.\n\n${text}` }],
+    });
+    return extractJson(fixed);
+  }
+}

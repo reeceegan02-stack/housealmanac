@@ -1,5 +1,5 @@
 // Street research and copywriting with the Claude API (web search enabled).
-import { claude, MODELS, webSearchTool } from './claude.js';
+import { claude, MODELS, webSearchTool, parseJson } from './claude.js';
 import { extractJson } from './util.js';
 
 const SCHEMA = `{
@@ -27,6 +27,7 @@ Rules:
 - British English. Warm, specific and factual; no clichés ("nestled", "rich tapestry", "hidden gem"), no exclamation marks.
 - story: exactly 3 paragraphs, 150 to 190 words in total, each paragraph 40 to 75 words.
 - timeline: 6 to 8 items in ascending year order. The last one or two items are about this home and have "key": true (for example the year the street or house was built, and "<names> make it home" in the move-in year if given). Use the move-in year only as given by the customer.
+- Inside JSON string values never use double quotation marks; use single quotes ('like this') instead.
 - Output ONLY one JSON object matching the schema, no commentary.`;
 
 export async function researchStreet(env, ctx) {
@@ -55,7 +56,7 @@ ${SCHEMA}`;
     tools: [webSearchTool(ctx.searches || 10)],
     messages: [{ role: 'user', content: prompt }],
   });
-  return validate(extractJson(text));
+  return validate(await parseJson(env, text));
 }
 
 export async function reviseContent(env, prev, request, ctx) {
@@ -77,7 +78,7 @@ Return ONLY the full updated JSON object, plus a field "change_summary" (one sen
     tools: [webSearchTool(4)],
     messages: [{ role: 'user', content: prompt }],
   });
-  return validate(extractJson(text));
+  return validate(await parseJson(env, text));
 }
 
 function validate(d) {

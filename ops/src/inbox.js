@@ -1,7 +1,7 @@
 // Handles mail to hello@housealmanac.co.uk: keeps a copy in Gmail, then answers or acts on it.
 import PostalMime from 'postal-mime';
 import { BRAND, ensureSchema, getOrder, updateOrder, logEvent, extractJson, now, fileUrl, kvGet, kvSet } from './util.js';
-import { claude, MODELS } from './claude.js';
+import { claude, MODELS, parseJson } from './claude.js';
 import { KB } from './kb.js';
 import { sendMail, approvedEmail, firstName } from './mail.js';
 import { createPrintOrder } from './prodigi.js';
@@ -81,7 +81,7 @@ Classify the email and draft a reply. JSON only:
  "reply": "the reply to send (empty if intent is approve, changes or thanks, since those get standard replies)"}
 "approve" only if they clearly approve the proof as it is. If they approve but also ask for any change, that's "changes".` }],
   });
-  const c = extractJson(text);
+  const c = await parseJson(env, text);
   await logEvent(env, order.id, 'inbox_classified', c);
 
   // Agent sent their logo (explicitly, i.e. replying to a proof) or a reviews link: add them and re-render once.
@@ -199,7 +199,7 @@ JSON only:
 "office_print_yes" = they want the framed print of their office (e.g. "yes", "yes please", "we'd love it"). "office_print_changes" = they want changes to the office print first.
 "sample_with_details" = they sent a buyer's new address with postcode and the branch postcode.` }],
   });
-  const c = extractJson(text);
+  const c = await parseJson(env, text);
   await logEvent(env, null, 'agent_mail', { agency: prospect.agency, intent: c.intent });
 
   if (c.intent === 'not_interested') {
@@ -313,7 +313,7 @@ async function handleGeneral(env, m) {
 
 JSON only: {"intent": "enquiry" | "supplier_or_sales_pitch" | "spam" | "other", "reply": "reply to send for genuine customer or trade enquiries, else empty"}` }],
   });
-  const c = extractJson(text);
+  const c = await parseJson(env, text);
   await logEvent(env, null, 'general_mail', { from: m.from, intent: c.intent });
   if (c.intent === 'enquiry' && c.reply) await sendMail(env, { to: m.from, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, text: c.reply });
 }
@@ -331,7 +331,7 @@ JSON only:
  "message": "the message for the print from the personalisation, else empty",
  "style": "heritage|modern|midnight|sage (default heritage)", "framed": true|false, "total_gbp": 0}` }],
   });
-  const o = extractJson(out);
+  const o = await parseJson(env, out);
   const receipt = String(o.receipt_id || '').replace(/\D/g, '');
   if (!o.is_etsy_sale || !receipt || !(o.ship?.postcode || o.print_address)) {
     return alert(env, 'forwarded Etsy email could not be read', `Subject: ${subject}\n\nCheck the order in Etsy and create it with /admin/test-order (source etsy) if needed.`);

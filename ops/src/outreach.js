@@ -4,7 +4,7 @@
 // identified, and an opt-out in every email. Every address is checked on the agency's own
 // website before we email it (no guessed addresses, fewer bounces).
 import { WorkflowEntrypoint } from 'cloudflare:workers';
-import { claude, MODELS, webSearchTool } from './claude.js';
+import { claude, MODELS, webSearchTool, parseJson } from './claude.js';
 import { kvGet, kvSet, now, logEvent, extractJson, ensureSchema, BRAND } from './util.js';
 import { sendMail } from './mail.js';
 
@@ -145,7 +145,7 @@ Skip these websites, we already know them: ${known.slice(-300).join(', ') || 'no
 JSON only: {"agents": [{"agency": "the short trading name customers know, without branch, location or legal suffix (e.g. \"Julian Wadden\", not \"Julian Wadden & Co Limited (Didsbury)\")", "company": "registered name incl. Ltd/Limited/LLP", "company_no": "", "email": "", "website": "https://...", "office": {"line1": "street address of their branch in this area", "line2": "", "city": "", "postcode": ""}, "evidence": "where you found the email and the company status"}]}` }],
   });
   let list = [];
-  try { list = extractJson(text).agents || []; } catch (e) { list = []; }
+  try { list = (await parseJson(env, text)).agents || []; } catch (e) { list = []; }
   let added = 0, rejected = 0;
   for (const a of list) {
     a.agency = cleanAgency(a.agency);

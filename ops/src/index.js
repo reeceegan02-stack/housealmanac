@@ -131,6 +131,9 @@ async function admin(req, env, url) {
   if (p === '/etsy/poll' && req.method === 'POST') return json(await pollEtsy(env));
   if (p === '/stripe/reconcile' && req.method === 'POST') return json(await reconcileStripe(env));
   if (p === '/check') return json(await systemsCheck(env));
+  // Admin-only: how long each key is (never the value), to spot empty or mis-pasted secrets.
+  if (p === '/keys') return json(Object.fromEntries(['ANTHROPIC_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'PRODIGI_API_KEY', 'ETSY_KEYSTRING', 'ETSY_SHARED_SECRET']
+    .map((k) => [k, typeof env[k] === 'string' ? env[k].length : null])));
   if (p === '/outreach/run' && req.method === 'POST') return json(await startDailyOutreach(env, new Date()));
   if (p === '/outreach/find' && req.method === 'POST') return json(await findProspects(env, body.area));
   if (p === '/samples') return json(await samplesStatus(env));
