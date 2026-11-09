@@ -63,6 +63,9 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **Free framed samples** (Reece, 9 Nov): 5, plus 1 more per agency that becomes a paying customer (`samplesStatus`). When none are left, agents get
   a free digital proof (source agent-proof); on approval they get the £75 agent link with ?client_reference_id=HA-…, and payment prints it.
   After every 3 over-cap sample requests hello@ gets a "Decision" email; Reece may approve more (raise FREE_SAMPLES_CAP).
+- Historic map: NLS 25-inch layer, missing tiles fall back to other county layers / lower zooms, with the OS six-inch 2nd edition
+  (os/6inchsecond) underneath as a backing layer, so coverage gaps never print blank. Busy streets (>80 sales): one dot per year.
+- Owner's name appears only on /terms and /privacy (legal identity), not in page footers (Reece's wish, 9 Nov).
 - Agent prints carry the agency logo (largest image they email, FILES logo-<domain>) and a QR code to their reviews link (kv review-<domain>).
 - Agent Stripe link (£75): https://buy.stripe.com/00w14pgrf75m1p62GD2wU02
 - **Cron every 30 min**: Prodigi tracking → "on its way" email; retry stuck orders (3 tries then alert); Stripe reconciliation (paid sessions

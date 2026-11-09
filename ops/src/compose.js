@@ -167,16 +167,22 @@ export function salesStrip(sales, nowYear = new Date().getFullYear()) {
   const fmt = (p) => '£' + (Math.round(p / 1000) * 1000).toLocaleString('en-GB');
   const eY0 = Math.floor(early[0].year), eY1 = Math.floor(early[early.length - 1].year);
   const lY0 = Math.floor(late[0].year), lY1 = Math.floor(late[late.length - 1].year);
+  // Busy streets (long main roads) can have hundreds of sales: plot the typical price per year instead.
+  const perYear = clean.length > 80;
+  const pts = perYear
+    ? Object.values(clean.reduce((g, s) => { (g[Math.floor(s.year)] ||= []).push(s); return g; }, {}))
+        .map(list => ({ year: Math.floor(list[0].year) + 0.5, price: med(list) }))
+    : clean;
   // Labels sit in their own row above the dots so they never collide with them.
   const svg = `<svg viewBox="0 0 640 116" style="width:128mm;height:23.2mm" aria-label="Recorded sale prices on the street">
     <line x1="30" y1="98" x2="630" y2="98" class="axis" stroke-width="1.6"/>
     <g font-family="Inter, sans-serif" font-size="13" class="softf">${ticks.map(t => `<text x="${X(t).toFixed(1)}" y="114" text-anchor="middle">${t}</text>`).join('')}</g>
-    <g class="dots">${clean.map(s => `<circle cx="${X(s.year).toFixed(1)}" cy="${Y(s.price).toFixed(1)}" r="4.4"/>`).join('')}</g>
+    <g class="dots">${pts.map(s => `<circle cx="${X(s.year).toFixed(1)}" cy="${Y(s.price).toFixed(1)}" r="4.4"/>`).join('')}</g>
     <g font-family="Inter, sans-serif" font-size="13" class="inkf" font-weight="600">
       <text x="30" y="14">Typical sale ${eY0}${eY1 > eY0 ? '–' + eY1 : ''}: ${fmt(med(early))}</text>
       <text x="630" y="14" text-anchor="end">Typical sale ${lY0}${lY1 > lY0 ? '–' + lY1 : ''}: ${fmt(med(late))}</text>
     </g></svg>`;
-  return { svg, caption: `${clean.length} recorded sales. House numbers and this home's own sales are left off.`, n: clean.length, from: y0 };
+  return { svg, caption: `${clean.length} recorded sales${perYear ? '; each dot is the typical price that year' : ''}. House numbers and this home's own sales are left off.`, n: clean.length, from: y0 };
 }
 
 // QR code as a crisp SVG (black modules on white), sized by its container.
