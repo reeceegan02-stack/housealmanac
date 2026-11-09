@@ -17,7 +17,15 @@ if (!process.env.WORKERS_CI) {
   console.log('sync-secrets: not running in Workers Builds, skipped');
   process.exit(0);
 }
-const present = NAMES.filter((n) => (process.env[n] || '').trim());
+// Exact name first; otherwise accept a build secret whose name starts with it
+// (e.g. a name pasted twice: STRIPE_WEBHOOK_SECRETSTRIPE_WEBHOOK_SECRET).
+const valueFor = (n) => {
+  const exact = (process.env[n] || '').trim();
+  if (exact) return exact;
+  const k = Object.keys(process.env).find((key) => key.startsWith(n) && (process.env[key] || '').trim());
+  return k ? process.env[k].trim() : '';
+};
+const present = NAMES.filter((n) => valueFor(n));
 if (!present.length) {
   console.log('sync-secrets: no build secrets set, skipped');
   process.exit(0);
@@ -26,7 +34,7 @@ if (!present.length) {
 const dir = mkdtempSync(join(tmpdir(), 'ha-'));
 const file = join(dir, 'secrets.json');
 try {
-  writeFileSync(file, JSON.stringify(Object.fromEntries(present.map((n) => [n, process.env[n].trim()]))), { mode: 0o600 });
+  writeFileSync(file, JSON.stringify(Object.fromEntries(present.map((n) => [n, valueFor(n)]))), { mode: 0o600 });
   execFileSync('npx', ['wrangler', 'secret', 'bulk', file], { stdio: ['ignore', 'ignore', 'pipe'] });
   console.log('sync-secrets: updated ' + present.join(', '));
 } catch (e) {
