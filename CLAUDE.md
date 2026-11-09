@@ -126,5 +126,5 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - `ops/` cloud operations worker · `site/` website · `pipeline/` print templates and render scripts · `marketing/` mockups, Etsy listing, ad copy · `business/` pricing model, ledger, prospects.
 
 ## Budget tracker (£2,000 all-in, from 9 Nov 2026)
-Spent to 9 Nov: £42.08 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60). Committed: free framed samples up to 5 × £51.30.
+Spent to 9 Nov: £42.08 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60). Committed: free framed samples up to 5 × £51.30; Etsy Ads up to ~£65 (Reece said yes 9 Nov: £4/day, 24 Nov–9 Dec, Etsy's new-shop wait ends 24 Nov; scheduled reminders switch it on 24 Nov and off 9 Dec).
 Keep this line current; the weekly growth agent recomputes it from business/ledger.csv.
