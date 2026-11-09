@@ -42,4 +42,4 @@ Hi {Agency} team, just bringing this back to the top of your inbox. The free sam
 Reece
 
 ## Cost of the free-sample offer
-Each free framed sample costs £51.30 (Prodigi frame + delivery + VAT). Cap: 5 samples (£256.50) for batch 1.
+Batch 1 SENT 2026-11-09 from hello@housealmanac.co.uk. Each free framed sample costs £51.30 (Prodigi frame + delivery + VAT). Cap: 5 samples (£256.50) for batch 1.

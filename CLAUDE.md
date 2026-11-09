@@ -2,12 +2,17 @@
 
 House Almanac sells personalised A3 house-history prints (https://housealmanac.co.uk).
 Owner: Reece Egan-Sheath, sole trader, Manchester. Claude runs the business; Reece only signs in, approves and pays.
-Goal set by Reece: grow towards £1m/yr revenue. Standing permission: purchases up to £50 (still confirm item + total with him before paying).
+Goal set by Reece: grow towards £1m/yr revenue.
+Standing approvals from Reece (9 Nov 2026): "full control" of marketing, orders, website and changes; he wants nothing to do with day-to-day.
+- Send all business email from hello@housealmanac.co.uk (never Reece's personal addresses).
+- Customer emails (proofs, order updates) and agent outreach/follow-ups: approved, no need to ask.
+- Prodigi orders for paid customer orders and approved agent free samples (batch 1: up to 5 x £51.30): approved.
+- Any other new purchase or subscription: tell Reece the item and total and get a yes first.
 
 ## Rules that always apply
 - Never enter passwords, card/bank details or ID, never create accounts — Reece does those.
 - Any purchase: tell Reece the item and total and get a yes first. Anything over £50 needs a separate yes.
-- Outbound messages (customer emails, agent outreach, social posts) need Reece's approval unless he has given a standing approval for that type in chat.
+- Outbound messages: covered by the standing approvals above. Anything new in kind (e.g. posting publicly as Reece, paid ads) - check with him first.
 - Don't publish real customers' names or addresses. Public samples use the fictional "Anita Street, Sam & Alex" sample.
 - Never show the customer's own purchase price on a print (other sales on the street are fine).
 - No ICO fee (Reece's decision). No Zoho yet — Reece keeps accounts in Excel; log every cost in `business/ledger.csv`.
@@ -32,6 +37,13 @@ Christmas: last order date 9 December.
 - Printing: Prodigi dashboard (dashboard.prodigi.com), card on file. Upload the print JPG (3508×4961, 300 dpi).
 - Domain/DNS/email routing: Cloudflare account reeceegan02@gmail.com.
 - Old worker `housealmanac-site` is retired (no domains); can be deleted.
+- **Sending email**: Cloudflare Email Service (Workers Paid, $5/mo) via Worker `housealmanac-mail` (POST JSON, header `x-key` must equal the Worker secret MAIL_KEY).
+  The key is NOT stored anywhere. Each session: generate a random key, set it in Cloudflare → Workers → housealmanac-mail → Settings → Variables and secrets → MAIL_KEY (Edit), then
+  in Chrome open https://housealmanac-mail.reeceegan02.workers.dev/ and run (same origin):
+  `await fetch('/',{method:'POST',headers:{'content-type':'application/json','x-key':KEY},body:JSON.stringify({to,subject,text,html,bcc:'hello@housealmanac.co.uk',fromName:'Reece Egan-Sheath | House Almanac'})})`
+  Always BCC hello@ so there's a copy in the inbox. Fields: to, subject, text, html, cc, bcc, attachments [{content(base64),filename,type,disposition}].
+  Replies arrive at hello@ → reeceegan02@gmail.com; read them in Chrome Gmail (search `to:hello@housealmanac.co.uk`). Only read House Almanac mail there.
+- Etsy shop: HouseAlmanac (Reece's Etsy account, signed in in Chrome). Listing copy in `marketing/etsy_listing.md`.
 
 ## Order runbook
 1. **Check for orders**: Stripe → Transactions. For each new paid order, note the order date, customer email, product, address, move-in year and message.
