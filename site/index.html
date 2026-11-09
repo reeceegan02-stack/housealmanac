@@ -20,6 +20,7 @@
 body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.6 Inter,system-ui,sans-serif}
 a{color:var(--brick)}
 .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.xmas{background:var(--brick);color:#fff;text-align:center;font-size:14.5px;padding:8px 16px;line-height:1.4}.xmas a{color:#fff;font-weight:600}
 header{border-bottom:1px solid var(--rule);background:var(--paper);position:sticky;top:0;z-index:5}
 header .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
 .logo{font:700 20px Lora,serif;letter-spacing:.01em;color:var(--ink);text-decoration:none}
@@ -84,6 +85,8 @@ footer a{color:var(--soft);margin-right:16px}
 </style>
 </head>
 <body>
+<div class="xmas" id="xmas">Christmas gift? <strong>Order by 9 December</strong> to have it with you before Christmas. You approve a proof first. <a href="#prices">See prices</a></div>
+<script>try{if(new Date()>new Date("2026-12-10T00:00:00Z"))document.getElementById("xmas").remove()}catch(e){}</script>
 <header><div class="wrap"><a class="logo" href="/">House Almanac</a><nav><a href="#how">How it works</a><a href="#prices">Prices</a><a href="#agents">Estate agents</a><a class="btn" href="#prices">Order</a></nav></div></header>
 
 <main>
