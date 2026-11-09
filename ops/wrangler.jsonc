@@ -11,7 +11,8 @@
   "kv_namespaces": [{ "binding": "FILES", "id": "b3de108bd54341ee843a5c93abe8c8a9" }],
   "workflows": [
     { "name": "housealmanac-order", "binding": "ORDER_FLOW", "class_name": "OrderWorkflow" },
-    { "name": "housealmanac-outreach", "binding": "OUTREACH_FLOW", "class_name": "OutreachWorkflow" }
+    { "name": "housealmanac-outreach", "binding": "OUTREACH_FLOW", "class_name": "OutreachWorkflow" },
+    { "name": "housealmanac-agents", "binding": "AGENT_FLOW", "class_name": "AgentWorkflow" }
   ],
   "triggers": { "crons": ["*/30 * * * *"] },
   // In Workers Builds, copy API keys from build secrets into runtime secrets (no-op locally).

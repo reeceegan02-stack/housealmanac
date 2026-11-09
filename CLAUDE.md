@@ -99,10 +99,15 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - Worker cron rebuilds a privacy-safe snapshot every 30 min → public https://housealmanac-ops.reeceegan02.workers.dev/status.json
   (no names/emails/addresses; scrubbed). GitHub Action `.github/workflows/ops-status.yml` copies it every 2 h into the open issue
   labelled `ops-status` ("Ops status"). Scheduled cloud sessions can only reach GitHub, so they read that issue.
-- **Daily maintenance agent** (scheduled task): reads the snapshot, fixes failures in code, pushes (auto-deploys). It acts through code and
-  config (e.g. OUTREACH_PAUSED, OUTREACH_PER_DAY in ops/wrangler.jsonc). Never commit personal data or secrets (the repo is public).
-- **Weekly growth agent** (scheduled task): reviews results, tunes outreach/website/Etsy copy, and queues press / gift-guide / partner emails in
-  `ops/outbox.json` (the worker sends them weekdays 9-17 UK, max OUTBOX_PER_DAY, once per id, honouring opt-outs; "no thanks" replies suppress).
+- **In-worker agents** (`ops/src/agent.js`, Workflow `housealmanac-agents`, Claude API with bounded tools; run in Cloudflare, no laptop):
+  - Daily ops agent 07:00 UTC: reads the snapshot; can restart stuck orders, pause/resume outreach (kv agent_outreach_paused),
+    and email Reece only when he must act (once per run).
+  - Weekly growth agent Mondays 09:00 UTC: can set outreach per-day (kv agent_outreach_per_day, 0-40) and queue up to 15 pitches
+    (press, gift guides, bloggers, partners) into D1 `outbox_queue` (with source URL); `ops/src/outbox.js` sends them weekdays 9-17 UK,
+    max OUTBOX_PER_DAY, never twice to one address, honouring opt-outs. Their notes appear in the snapshot (`agents`).
+  - Admin: POST /admin/agent/run {agent: ops|growth}, GET /admin/outbox.
+- Code fixes still need a Claude Code session (scheduled cloud sessions were blocked by a permission check on 9 Nov; Reece can enable one).
+  Such a session reads the `ops-status` issue (only GitHub is reachable), fixes code, pushes. `ops/outbox.json` is a code-level outbox too.
 - Repo is PUBLIC (visibility can't be changed from here): keep it free of personal data; customer data stays in D1/KV only.
 
 ## Manual fallback runbook (only if the automation is down)

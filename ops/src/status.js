@@ -46,7 +46,11 @@ export async function buildStatus(env) {
       samples: await samplesStatus(env),
     },
     inbox_7d: await q(`SELECT kind, count(*) n FROM events WHERE at >= ? AND (kind LIKE 'inbox%' OR kind IN ('general_mail','agent_mail','etsy_forward','owner_reply_sent')) GROUP BY kind`, since7),
-    outbox: { sent: Number(await kvGet(env, 'outbox_sent_count') || 0) },
+    outbox: { sent: Number(await kvGet(env, 'outbox_sent_count') || 0),
+      queue: await q(`SELECT kind, status, count(*) n FROM outbox_queue GROUP BY kind, status`).catch(() => []) },
+    agents: (await q(`SELECT at, kind, detail FROM events WHERE kind IN ('agent_ops','agent_growth') ORDER BY id DESC LIMIT 6`))
+      .map(e => { let d = {}; try { d = JSON.parse(e.detail); } catch {} return { at: e.at, agent: e.kind, note: scrub(d.final, 400), actions: (d.actions || []).map(a => a.tool) }; }),
+    controls: { outreach_paused_by_agent: (await kvGet(env, 'agent_outreach_paused')) === 'true', outreach_per_day_override: await kvGet(env, 'agent_outreach_per_day') },
     claude_usd: { promo: Number(await kvGet(env, 'claude_usd_promo') || 0).toFixed(2), paid: Number(await kvGet(env, 'claude_usd_paid') || 0).toFixed(2) },
   };
   await kvSet(env, 'status_json', JSON.stringify(status));

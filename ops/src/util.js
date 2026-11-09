@@ -65,6 +65,8 @@ const MIGRATIONS = [
   // Agencies emailed before office previews (9 Nov 2026) were offered a free framed print for a buyer; keep that promise.
   `UPDATE prospects SET office_json = json_set(coalesce(office_json, '{}'), '$.offer', 'buyer_sample') WHERE last_contact IS NOT NULL AND last_contact < '2026-11-09T16:00:00Z' AND json_extract(coalesce(office_json, '{}'), '$.offer') IS NULL`,
   `CREATE INDEX IF NOT EXISTS prospects_domain ON prospects (domain)`,
+  `CREATE TABLE IF NOT EXISTS outbox_queue (id TEXT PRIMARY KEY, created_at TEXT, to_email TEXT, outlet TEXT, kind TEXT, subject TEXT, text TEXT, source_url TEXT, status TEXT, sent_at TEXT)`,
+  `CREATE INDEX IF NOT EXISTS outbox_queue_to ON outbox_queue (to_email)`,
 ];
 
 let schemaReady = false;
@@ -113,7 +115,7 @@ export async function updateOrder(env, id, fields) {
 export const esc = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export const CODE_VERSION = '2026-11-09.17';
+export const CODE_VERSION = '2026-11-09.18';
 export function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { 'content-type': 'application/json', 'x-ha-version': CODE_VERSION } });
 }

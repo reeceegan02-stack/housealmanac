@@ -7,6 +7,7 @@ import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { claude, MODELS, webSearchTool, parseJson } from './claude.js';
 import { kvGet, kvSet, now, logEvent, extractJson, ensureSchema, BRAND } from './util.js';
 import { sendMail } from './mail.js';
+import { outreachPaused, outreachPerDayOverride } from './controls.js';
 
 // Worked through in order; each run moves on to the next area when the pool runs low.
 export const AREAS = [
@@ -193,7 +194,9 @@ export async function perDay(env) {
   let first = await kvGet(env, 'outreach_first_day');
   if (!first) { first = today(); await kvSet(env, 'outreach_first_day', first); }
   const days = (Date.parse(today()) - Date.parse(first)) / 86400e3;
-  return days < 7 ? Number(env.OUTREACH_WARMUP_PER_DAY || 10) : Number(env.OUTREACH_PER_DAY || 20);
+  const base = days < 7 ? Number(env.OUTREACH_WARMUP_PER_DAY || 10) : Number(env.OUTREACH_PER_DAY || 20);
+  const override = await outreachPerDayOverride(env); // set by the growth/ops agents, 0-40
+  return override ?? base;
 }
 
 async function poolSize(env) {
@@ -305,7 +308,7 @@ export class OutreachWorkflow extends WorkflowEntrypoint {
 // Called by the cron: weekdays at 10:00 UK time, once a day.
 export async function startDailyOutreach(env, d = new Date()) {
   const day = d.getUTCDay();
-  if (day === 0 || day === 6 || env.OUTREACH_PAUSED === 'true') return { skipped: 'weekend or paused' };
+  if (day === 0 || day === 6 || await outreachPaused(env)) return { skipped: 'weekend or paused' };
   const id = `outreach-${d.toISOString().slice(0, 10)}`;
   try {
     await env.OUTREACH_FLOW.create({ id });

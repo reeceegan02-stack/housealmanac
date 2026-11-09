@@ -3,6 +3,7 @@ import { OrderWorkflow } from './workflow.js';
 import { ingestStripeSession, reconcileStripe } from './stripe-orders.js';
 import { systemsCheck } from './check.js';
 import { cachedStatus, buildStatus } from './status.js';
+import { AgentWorkflow, startAgent } from './agent.js';
 import { OutreachWorkflow, startDailyOutreach, findProspects, samplesStatus, startPreview } from './outreach.js';
 import { ensureSchema, json, getOrder, logEvent, updateOrder, now, fileUrl } from './util.js';
 import { verifyStripe, stripeGet, sessionToOrder } from './stripe.js';
@@ -13,7 +14,7 @@ import { sendMail, orderReceivedEmail, approvedEmail } from './mail.js';
 import { createPrintOrder } from './prodigi.js';
 import { etsyConnect, etsyCallback, pollEtsy } from './etsy.js';
 
-export { OrderWorkflow, OutreachWorkflow };
+export { OrderWorkflow, OutreachWorkflow, AgentWorkflow };
 
 export default {
   async fetch(req, env, ctx) {
@@ -137,6 +138,8 @@ async function admin(req, env, url) {
   if (p === '/stripe/reconcile' && req.method === 'POST') return json(await reconcileStripe(env));
   if (p === '/check') return json(await systemsCheck(env));
   if (p === '/status/rebuild' && req.method === 'POST') return json(await buildStatus(env));
+  if (p === '/agent/run' && req.method === 'POST') return json(await startAgent(env, body.agent === 'growth' ? 'growth' : 'ops', 'manual-' + Date.now()));
+  if (p === '/outbox') return json((await env.DB.prepare('SELECT id, created_at, outlet, kind, subject, status, sent_at, source_url FROM outbox_queue ORDER BY created_at DESC LIMIT 100').all()).results);
   // Admin-only: how long each key is (never the value), to spot empty or mis-pasted secrets.
   if (p === '/keys') return json(Object.fromEntries(['ANTHROPIC_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'PRODIGI_API_KEY', 'ETSY_KEYSTRING', 'ETSY_SHARED_SECRET']
     .map((k) => [k, typeof env[k] === 'string' ? env[k].length : null])));
