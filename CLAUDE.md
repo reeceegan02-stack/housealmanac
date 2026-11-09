@@ -30,9 +30,7 @@ Christmas: last order date 9 December.
 
 ## Systems
 - Website: `site/` → Cloudflare Worker `housealmanac-web` (static assets), custom domains housealmanac.co.uk + www.
-  Deploy: Cloudflare dashboard → Workers & Pages → housealmanac-web → New deployment → upload files.
-  Files must be uploaded from `/mnt/user-data/uploads/...` (stage them from Reece's Dropbox folder
-  `C:\Users\reece\Dropbox\Refined business consulting\House Almanc\website\` with device_stage_files first).
+  Deploy: push to GitHub `main` — Workers Builds deploys the site automatically (root `/`, uses `wrangler.jsonc`). No manual upload needed.
 - Payments: Stripe (account "House Almanac"), dashboard.stripe.com. Orders show under Transactions; custom fields carry the address, move-in year and message.
 - Printing: Prodigi dashboard (dashboard.prodigi.com), card on file. Upload the print JPG (3508×4961, 300 dpi).
 - Domain/DNS/email routing: Cloudflare account reeceegan02@gmail.com.
