@@ -4,11 +4,12 @@ import { getPrintOrder } from './prodigi.js';
 import { sendMail, shippedEmail } from './mail.js';
 import { startOrderWorkflow } from './orders.js';
 import { pollEtsy, etsyMarkShipped } from './etsy.js';
+import { reconcileStripe } from './stripe-orders.js';
 
 export async function runScheduled(event, env) {
   await ensureSchema(env);
   const d = new Date(event.scheduledTime || Date.now());
-  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env)];
+  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env)];
   if (d.getUTCHours() === 9 && d.getUTCMinutes() < 30) jobs.push(agentFollowUps(env));
   if (d.getUTCDay() === 1 && d.getUTCHours() === 8 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env));
   const results = await Promise.allSettled(jobs);

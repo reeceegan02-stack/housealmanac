@@ -1,5 +1,6 @@
 // House Almanac operations worker: Stripe orders -> research -> proof -> Prodigi, plus inbox and schedules.
 import { OrderWorkflow } from './workflow.js';
+import { ingestStripeSession, reconcileStripe } from './stripe-orders.js';
 import { ensureSchema, json, getOrder, logEvent, updateOrder, now, fileUrl } from './util.js';
 import { verifyStripe, stripeGet, sessionToOrder } from './stripe.js';
 import { createOrder, startOrderWorkflow } from './orders.js';
@@ -67,12 +68,8 @@ async function stripeWebhook(req, env, ctx) {
   if (evt.type === 'checkout.session.completed' || evt.type === 'checkout.session.async_payment_succeeded') {
     const s0 = evt.data.object;
     if (s0.payment_status !== 'paid') return json({ received: true, skipped: 'not paid' });
-    const s = await stripeGet(env, `/checkout/sessions/${s0.id}`);
-    const fields = sessionToOrder(s);
-    const order = await createOrder(env, { source: 'stripe', ...fields });
-    const t = orderReceivedEmail({ ...fields, id: order.id });
-    if (fields.email && order.isNew) ctx.waitUntil(sendMail(env, { to: fields.email, subject: t.subject, text: t.text, orderId: order.id }));
-    return json({ received: true, order: order.id });
+    const r = await ingestStripeSession(env, s0.id);
+    return json({ received: true, ...r });
   }
   return json({ received: true, ignored: evt.type });
 }
@@ -130,5 +127,6 @@ async function admin(req, env, url) {
   if (p === '/send' && req.method === 'POST') return json(await sendMail(env, body));
   if (p === '/summary' && req.method === 'POST') { await weeklySummary(env); return json({ ok: true }); }
   if (p === '/etsy/poll' && req.method === 'POST') return json(await pollEtsy(env));
+  if (p === '/stripe/reconcile' && req.method === 'POST') return json(await reconcileStripe(env));
   return json({ error: 'unknown admin route' }, 404);
 }

@@ -52,10 +52,11 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **Inbox**: hello@ → Email Routing → worker `email()` → copy forwarded to reeceegan02@gmail.com → Claude classifies:
   approve → Prodigi API order; changes → revised proof; cancel before approval → Stripe refund; damaged with photo → free replacement;
   agent replies → answered, free-sample orders created (cap 5), "no thanks" → opted out; general enquiries → answered.
-- **Cron every 30 min**: Prodigi tracking → "on its way" email; retry stuck orders (3 tries then alert); 9am agent follow-ups; Monday weekly summary to hello@.
+- **Cron every 30 min**: Prodigi tracking → "on its way" email; retry stuck orders (3 tries then alert); Stripe reconciliation (paid sessions
+  with no order get created, and hello@ is warned the webhook missed them); 9am agent follow-ups; Monday weekly summary to hello@.
 - **Admin API** (header `x-admin-key` = Worker secret ADMIN_KEY; not stored anywhere — rotate it in Worker settings if you need access):
   GET /admin/orders · GET /admin/order/:id · POST /admin/order/:id/restart · POST /admin/order/:id/approve · POST /admin/test-order
-  · GET|POST /admin/prospects · GET /admin/events · POST /admin/send · POST /admin/summary · POST /admin/order/:id/set (fields)
+  · GET|POST /admin/prospects · GET /admin/events · POST /admin/send · POST /admin/summary · POST /admin/order/:id/set (fields) · POST /admin/stripe/reconcile · POST /admin/etsy/poll
   A restarted order reuses its saved research (data_json); set data_json to null first to force fresh research.
 - Secrets (ANTHROPIC_API_KEY, PRODIGI_API_KEY, STRIPE_SECRET_KEY (restricted), STRIPE_WEBHOOK_SECRET, later ETSY_KEYSTRING/ETSY_SHARED_SECRET)
   live as **Build** secrets on housealmanac-ops (Settings → Build → Variables and secrets). Each Workers Build copies them into runtime
