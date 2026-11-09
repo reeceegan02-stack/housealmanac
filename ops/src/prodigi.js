@@ -57,3 +57,9 @@ export async function getPrintOrder(env, id) {
   const d = await call(env, `/Orders/${id}`);
   return d.order;
 }
+
+// For the systems check: confirms the key works and returns the framed product's attributes.
+export async function prodigiCheck(env) {
+  const d = await call(env, `/products/${SKUS.framed}`);
+  return { ok: !!d.product, attributes: d.product?.attributes || {} };
+}

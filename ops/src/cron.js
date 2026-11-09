@@ -5,6 +5,7 @@ import { sendMail, shippedEmail } from './mail.js';
 import { startOrderWorkflow } from './orders.js';
 import { pollEtsy, etsyMarkShipped } from './etsy.js';
 import { reconcileStripe } from './stripe-orders.js';
+import { systemsCheck } from './check.js';
 
 export async function runScheduled(event, env) {
   await ensureSchema(env);
@@ -83,6 +84,8 @@ export async function weeklySummary(env) {
   const orders = await env.DB.prepare(`SELECT status, count(*) n, sum(amount_pence) p FROM orders WHERE created_at >= ? GROUP BY status`).bind(since).all();
   const attention = await env.DB.prepare(`SELECT id, address, notes FROM orders WHERE status = 'needs_attention'`).all();
   const prospects = await env.DB.prepare(`SELECT status, count(*) n FROM prospects GROUP BY status`).all();
+  const sys = await systemsCheck(env);
+  const sysLine = ['prodigi', 'stripe', 'claude'].map((k) => `${k} ${sys[k].ok ? 'OK' : 'FAILING: ' + sys[k].error}`).join(' · ') + ` · etsy ${sys.etsy?.connected ? 'connected' : 'not connected'}`;
   const total = orders.results.reduce((a, r) => a + (r.p || 0), 0);
   const count = orders.results.reduce((a, r) => a + r.n, 0);
   const text = `House Almanac: last 7 days
@@ -93,8 +96,10 @@ ${orders.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}
 Estate agents:
 ${prospects.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}
 
+Systems: ${sysLine}
+
 Needs attention: ${attention.results.length ? '\n' + attention.results.map(a => `- ${a.id} ${a.address}: ${a.notes || ''}`).join('\n') : 'nothing'}
 
 (Automatic weekly summary. No action needed unless something is listed above.)`;
-  await sendMail(env, { to: BRAND.from, bcc: false, subject: 'House Almanac weekly summary', text });
+  await sendMail(env, { to: BRAND.from, bcc: false, subject: `House Almanac weekly summary${sys.ok ? '' : ' (ACTION NEEDED: a service is failing)'}`, text });
 }

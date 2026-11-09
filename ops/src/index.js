@@ -1,6 +1,7 @@
 // House Almanac operations worker: Stripe orders -> research -> proof -> Prodigi, plus inbox and schedules.
 import { OrderWorkflow } from './workflow.js';
 import { ingestStripeSession, reconcileStripe } from './stripe-orders.js';
+import { systemsCheck } from './check.js';
 import { ensureSchema, json, getOrder, logEvent, updateOrder, now, fileUrl } from './util.js';
 import { verifyStripe, stripeGet, sessionToOrder } from './stripe.js';
 import { createOrder, startOrderWorkflow } from './orders.js';
@@ -128,5 +129,6 @@ async function admin(req, env, url) {
   if (p === '/summary' && req.method === 'POST') { await weeklySummary(env); return json({ ok: true }); }
   if (p === '/etsy/poll' && req.method === 'POST') return json(await pollEtsy(env));
   if (p === '/stripe/reconcile' && req.method === 'POST') return json(await reconcileStripe(env));
+  if (p === '/check') return json(await systemsCheck(env));
   return json({ error: 'unknown admin route' }, 404);
 }
