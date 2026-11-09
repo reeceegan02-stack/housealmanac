@@ -16,7 +16,10 @@ export default {
     const url = new URL(req.url);
     const p = url.pathname;
     try {
-      if (p === '/' || p === '/health') return json({ ok: true, service: 'housealmanac-ops', time: now() });
+      if (p === '/' || p === '/health') {
+        const keys = Object.fromEntries(['ANTHROPIC_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'PRODIGI_API_KEY', 'ETSY_KEYSTRING'].map((k) => [k, !!env[k]]));
+        return json({ ok: true, service: 'housealmanac-ops', time: now(), keys });
+      }
 
       // Public print/proof files (unguessable keys) for Prodigi and email links.
       if (p.startsWith('/f/')) {
