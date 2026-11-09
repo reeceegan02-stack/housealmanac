@@ -7,10 +7,12 @@ import { logEvent, BRAND, getOrder, updateOrder, fileUrl } from './util.js';
 import { createPrintOrder } from './prodigi.js';
 import { approvedEmail } from './mail.js';
 import { maybeSendAgencyCode } from './agents.js';
+import { isVoucherSession, createVoucherFromSession } from './voucher.js';
 
 export async function ingestStripeSession(env, sessionId) {
   const s = await stripeGet(env, `/checkout/sessions/${sessionId}`);
   if (s.payment_status !== 'paid') return { skipped: 'not paid' };
+  if (isVoucherSession(s)) return createVoucherFromSession(env, s); // gift voucher: emailed as a PDF, redeemed later
   // Agent paying for a proof we already made (link carries ?client_reference_id=HA-XXXXXX).
   if (s.client_reference_id) {
     const o = await getOrder(env, s.client_reference_id);
@@ -36,17 +38,18 @@ export async function reconcileStripe(env) {
   const missed = [];
   for (const s of list.data || []) {
     if (s.payment_status !== 'paid') continue;
-    const exists = await env.DB.prepare('SELECT id FROM orders WHERE external_ref = ?').bind(s.id).first();
+    const exists = await env.DB.prepare('SELECT id FROM orders WHERE external_ref = ?').bind(s.id).first()
+      || await env.DB.prepare('SELECT code FROM vouchers WHERE session_id = ?').bind(s.id).first();
     if (exists) continue;
     const r = await ingestStripeSession(env, s.id);
-    missed.push(r.order);
-    await logEvent(env, r.order, 'stripe_reconciled', { session: s.id });
+    missed.push(r.order || r.voucher);
+    await logEvent(env, r.order || null, 'stripe_reconciled', { session: s.id, voucher: r.voucher });
   }
   if (missed.length) {
     await sendMail(env, {
       to: BRAND.from, bcc: false,
       subject: `Check the Stripe webhook: ${missed.length} paid order(s) picked up by the backup check`,
-      text: `These paid orders didn't arrive through the Stripe webhook, so the 30-minute check created them instead: ${missed.join(', ')}.\n\nThey are being processed normally. If this keeps happening, check Stripe → Developers → Webhooks for delivery errors.`,
+      text: `These paid orders (or gift vouchers) didn't arrive through the Stripe webhook, so the 30-minute check created them instead: ${missed.join(', ')}.\n\nThey are being processed normally. If this keeps happening, check Stripe → Developers → Webhooks for delivery errors.`,
     });
   }
   return { missed };

@@ -85,13 +85,27 @@ Email from ${m.from}, subject "${m.subject}", ${m.attachments.length} attachment
 Classify the email and draft a reply. JSON only:
 {"intent": "approve" | "changes" | "cancel" | "damaged" | "question" | "needs_decision" | "thanks" | "other",
  "suggested_answer": "for needs_decision: what you'd suggest Reece replies",
- "change_request": "if intent is changes: the exact changes requested, else empty",
+ "change_request": "if intent is changes: the exact changes requested to the print itself, else empty",
+ "frame_colour": "black" | "white" | "natural" | "",
  "reply": "the reply to send (empty if intent is approve, changes or thanks, since those get standard replies)"}
-"approve" only if they clearly approve the proof as it is. If they approve but also ask for any change, that's "changes".
+"approve" only if they clearly approve the proof as it is. If they approve but also ask for any change to the print, that's "changes".
+"frame_colour": only if they ask for a frame colour (natural = natural wood); empty otherwise. A frame colour on its own is not a change to the print: if they also approve, the intent is "approve"; if not, it's "question" with a reply confirming the colour.${order.product === 'framed' ? '' : ' (This order is an unframed print, so leave frame_colour empty and explain that in the reply.)'}
 "needs_decision" = anything the policies don't cover or that needs the owner (refund or compensation after approval, complaints, cancellation after printing, legal or data requests, anything you're unsure of).` }],
   });
   const c = await parseJson(env, text);
   await logEvent(env, order.id, 'inbox_classified', c);
+
+  // Frame colour (black as standard; white or natural wood on request): stored with the delivery details for Prodigi.
+  const colour = String(c.frame_colour || '').toLowerCase();
+  if (order.product === 'framed' && ['black', 'white', 'natural'].includes(colour) && !['printing', 'shipped', 'delivered', 'cancelled'].includes(order.status)) {
+    const ship = JSON.parse(order.ship_json || '{}');
+    if (ship.frame_colour !== colour) {
+      ship.frame_colour = colour;
+      order.ship_json = JSON.stringify(ship);
+      await updateOrder(env, order.id, { ship_json: order.ship_json });
+      await logEvent(env, order.id, 'frame_colour', { colour });
+    }
+  }
 
   // Agent sent their logo (explicitly, i.e. replying to a proof) or a reviews link: add them and re-render once.
   if (order.source.startsWith('agent-') && ['proof_sent', 'needs_attention'].includes(order.status) && c.intent !== 'changes') {
@@ -122,7 +136,7 @@ Classify the email and draft a reply. JSON only:
     await updateOrder(env, order.id, { status: 'awaiting_payment' });
     await sendMail(env, {
       to: m.from, orderId: order.id, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, fromName: 'Reece Egan-Sheath | House Almanac',
-      text: `Hi,\n\nGreat. Framed (black frame, ready to hang) and delivered it's £89, here:\n${u}\n\nYou can skip the address box at checkout; we already have it. As soon as it's paid it goes to print and arrives in 3 to 5 working days.\n\nBest wishes,\nReece\nHouse Almanac`,
+      text: `Hi,\n\nGreat. Framed (black frame, ready to hang) and delivered it's £89, here:\n${u}\n\nAt checkout, add where you'd like it delivered (we already have the print, so any other boxes can just repeat the street). As soon as it's paid it goes to print and arrives in 3 to 5 working days.\n\nBest wishes,\nReece\nHouse Almanac`,
     });
     return;
   }
@@ -178,6 +192,17 @@ House Almanac`,
     }
     return;
   }
+  if (c.intent === 'cancel' && order.source === 'voucher' && ['new', 'researching', 'revising', 'proof_sent', 'needs_attention'].includes(order.status)) {
+    const code = String(order.external_ref || '').replace(/^voucher-/, '');
+    // free the external_ref so the voucher can be redeemed again later
+    await updateOrder(env, order.id, { status: 'cancelled', external_ref: `${order.external_ref}-cancelled-${Date.now()}` });
+    const v = await env.DB.prepare(`SELECT expires_at FROM vouchers WHERE code = ?`).bind(code).first();
+    await env.DB.prepare(`UPDATE vouchers SET status = 'active', order_id = NULL, redeemed_at = NULL WHERE code = ?`).bind(code).run();
+    await logEvent(env, order.id, 'voucher_order_cancelled', { code });
+    await sendMail(env, { to: m.from, orderId: order.id, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`,
+      text: `Hi ${firstName(order.name)},\n\nNo problem, I've cancelled order ${order.id}. Your gift voucher ${code} is active again, so you can use it at housealmanac.co.uk/redeem any time${v?.expires_at ? ` before ${new Date(v.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}.\n\nBest wishes,\nReece\nHouse Almanac` });
+    return;
+  }
   if (c.intent === 'damaged' && ['printing', 'shipped', 'delivered'].includes(order.status)) {
     const hasPhoto = m.attachments.some(a => /image\//.test(a.mimeType || ''));
     const already = await env.DB.prepare(`SELECT count(*) n FROM events WHERE order_id = ? AND kind = 'replacement'`).bind(order.id).first();
@@ -224,15 +249,6 @@ JSON only:
   const c = await parseJson(env, text);
   await logEvent(env, null, 'agent_mail', { agency: prospect.agency, intent: c.intent });
 
-  if (c.intent === 'free_print_request' && /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/i.test(c.address || '')) {
-    const recent = (await env.DB.prepare(`SELECT count(*) n FROM orders WHERE source = 'partner-proof' AND created_at >= ?`).bind(new Date(Date.now() - 7 * 86400e3).toISOString()).first()).n;
-    if (recent >= 10) return escalate(env, m, null, 'Free digital print request over the weekly limit of 10; make it anyway if worthwhile.');
-    const { createOrder } = await import('./orders.js');
-    const order = await createOrder(env, { source: 'partner-proof', email: m.from, name: m.name || '', product: 'framed', amount_pence: 0, address: c.address, message: '', style: 'heritage', ship_json: '{}', external_ref: null });
-    await sendMail(env, { to: m.from, orderId: order.id, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac',
-      text: `Hi${m.name ? ' ' + m.name.split(' ')[0] : ''},\n\nLovely, thank you. I'm researching ${c.address.split(',').slice(0, 2).join(',')} now and will email you the print within 2 working days.\n\nBest wishes,\nReece\nHouse Almanac` });
-    return;
-  }
   if (c.intent === 'not_interested') {
     await env.DB.prepare(`UPDATE prospects SET status = 'opted_out', last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), prospect.email).run();
     return;
@@ -336,13 +352,17 @@ async function handleBounce(env, text, subject) {
 }
 
 async function handleGeneral(env, m) {
+  const { vouchersFor } = await import('./voucher.js');
+  const vs = await vouchersFor(env, m.from).catch(() => []);
+  const vctx = vs.length ? `\nThis sender bought these House Almanac gift vouchers (they are the buyer, so you may tell them the codes, e.g. to resend a lost voucher): ${vs.map(v => `${v.code} (${v.product} print, ${v.status}, bought ${v.created_at.slice(0, 10)}, valid until ${v.expires_at.slice(0, 10)}${v.recipient ? ', for ' + v.recipient : ''})`).join('; ')}.` : '';
   const { text } = await claude(env, {
     model: MODELS.research, maxTokens: 1000,
     system: `You handle the inbox for House Almanac, replying as Reece. Business facts:\n${KB}\n\nWarm, brief, British English, plain text.`,
     messages: [{ role: 'user', content: `Email from ${m.name || ''} <${m.from}>, subject "${m.subject}":
-"""${m.body}"""
+"""${m.body}"""${vctx}
 
-JSON only: {"intent": "enquiry" | "free_print_request" | "needs_decision" | "not_interested" | "supplier_or_sales_pitch" | "spam" | "other", "address": "for free_print_request: the full address (with postcode) they want the print made for, if given", "reply": "reply to send for genuine customer or trade enquiries, else empty", "suggested_answer": "for needs_decision: what you would suggest Reece replies, else empty"}
+JSON only: {"intent": "enquiry" | "free_print_request" | "voucher_refund" | "needs_decision" | "not_interested" | "supplier_or_sales_pitch" | "spam" | "other", "address": "for free_print_request: the full address (with postcode) they want the print made for, if given", "reply": "reply to send for genuine customer or trade enquiries, else empty", "suggested_answer": "for needs_decision: what you would suggest Reece replies, else empty"}
+"voucher_refund" = someone who bought a gift voucher asks to cancel it or get their money back.
 "free_print_request" = a press contact, blogger, group or business partner replying to our pitch and taking up our offer of a free digital print of a street of their choice (if they gave no address, the reply should ask for it).
 "needs_decision" = anything the business facts and policies don't cover or that needs the owner: complaints asking for money or compensation, requests outside the policies, press or media, partnerships, wholesale or bulk deals, legal or data-protection requests, anything you're unsure of.` }],
   });
@@ -350,8 +370,43 @@ JSON only: {"intent": "enquiry" | "free_print_request" | "needs_decision" | "not
   await logEvent(env, null, 'general_mail', { from: m.from, intent: c.intent });
   const reSubject = m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`;
   if (c.intent === 'not_interested') { await kvSet(env, 'suppress_' + m.from.toLowerCase(), new Date().toISOString()); return; } // e.g. "no thanks" to a press pitch
+  if (c.intent === 'free_print_request' && !/[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/i.test(c.address || '')) {
+    if (c.reply) await sendMail(env, { to: m.from, subject: reSubject, text: c.reply }); // ask for the address
+    return;
+  }
+  if (c.intent === 'free_print_request' && /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/i.test(c.address || '')) {
+    const recent = (await env.DB.prepare(`SELECT count(*) n FROM orders WHERE source = 'partner-proof' AND created_at >= ?`).bind(new Date(Date.now() - 7 * 86400e3).toISOString()).first()).n;
+    if (recent >= 10) return escalate(env, m, null, 'Free digital print request over the weekly limit of 10; make it anyway if worthwhile.');
+    const { createOrder } = await import('./orders.js');
+    const order = await createOrder(env, { source: 'partner-proof', email: m.from, name: m.name || '', product: 'framed', amount_pence: 0, address: c.address, message: '', style: 'heritage', ship_json: '{}', external_ref: null });
+    await sendMail(env, { to: m.from, orderId: order.id, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac',
+      text: `Hi${m.name ? ' ' + m.name.split(' ')[0] : ''},\n\nLovely, thank you. I'm researching ${c.address.split(',').slice(0, 2).join(',')} now and will email you the print within 2 working days.\n\nBest wishes,\nReece\nHouse Almanac` });
+    return;
+  }
+  if (c.intent === 'voucher_refund') return refundVoucher(env, m, vs, reSubject, c.suggested_answer);
   if (c.intent === 'needs_decision') return escalate(env, m, null, c.suggested_answer);
   if (c.intent === 'enquiry' && c.reply) await sendMail(env, { to: m.from, subject: reSubject, text: c.reply });
+}
+
+// Unused gift voucher, bought in the last 14 days: refund it in full (the cancellation period). Anything else goes to Reece.
+async function refundVoucher(env, m, vs, reSubject, suggestion) {
+  const ok = vs.filter(v => v.status === 'active' && Date.now() - Date.parse(v.created_at) <= 14 * 86400e3 && !String(v.session_id).startsWith('test-'));
+  const v = ok.find(x => m.body.toUpperCase().includes(x.code)) || (ok.length === 1 ? ok[0] : null);
+  if (!v) return escalate(env, m, null, suggestion || 'Gift voucher refund request outside the automatic rule (one unused voucher bought in the last 14 days).');
+  const claim = await env.DB.prepare(`UPDATE vouchers SET status = 'refunding' WHERE code = ? AND status = 'active'`).bind(v.code).run();
+  if (!claim.meta?.changes) return escalate(env, m, null, suggestion);
+  try {
+    const s = await stripeGet(env, `/checkout/sessions/${v.session_id}`);
+    if (!s.payment_intent) throw new Error('no payment_intent on the session');
+    await stripePost(env, '/refunds', { payment_intent: s.payment_intent });
+    await env.DB.prepare(`UPDATE vouchers SET status = 'refunded' WHERE code = ?`).bind(v.code).run();
+    await logEvent(env, null, 'voucher_refunded', { code: v.code });
+    await sendMail(env, { to: m.from, subject: reSubject, text: `Hi,\n\nNo problem: gift voucher ${v.code} is cancelled and we've refunded you in full. It usually shows on your statement within 5 to 10 days.\n\nBest wishes,\nReece\nHouse Almanac` });
+  } catch (e) {
+    await env.DB.prepare(`UPDATE vouchers SET status = 'active' WHERE code = ? AND status = 'refunding'`).bind(v.code).run();
+    await alert(env, `Voucher refund failed for ${v.code}`, e.message);
+    return escalate(env, m, null, `Refund of voucher ${v.code} failed automatically (${e.message}); refund it in Stripe and reply.`);
+  }
 }
 
 // Outside policy: send a holding reply and ask Reece (via hello@ -> Gmail) for a decision.

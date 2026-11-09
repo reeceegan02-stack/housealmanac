@@ -12,11 +12,12 @@ import { systemsCheck } from './check.js';
 import { PREPAID_USD } from './claude.js';
 import { kvGet, kvSet } from './util.js';
 import { startDailyOutreach, samplesStatus } from './outreach.js';
+import { voucherSafetyNet } from './voucher.js';
 
 export async function runScheduled(event, env) {
   await ensureSchema(env);
   const d = new Date(event.scheduledTime || Date.now());
-  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env)];
+  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env), voucherSafetyNet(env)];
   if (d.getUTCHours() === 10 && d.getUTCMinutes() < 30) jobs.push(startDailyOutreach(env, d));
   if (d.getUTCDay() === 1 && d.getUTCHours() === 8 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env));
   if (d.getUTCHours() === 7 && d.getUTCMinutes() < 30) jobs.push(startAgent(env, 'ops', d.toISOString().slice(0, 10)));
@@ -84,6 +85,8 @@ export async function weeklySummary(env) {
   const prospects = await env.DB.prepare(`SELECT status, count(*) n FROM prospects GROUP BY status`).all();
   const sentWeek = (await env.DB.prepare(`SELECT count(*) n FROM events WHERE kind = 'email_sent' AND at >= ? AND detail LIKE '%completion gift%'`).bind(since).first()).n;
   const samples = await samplesStatus(env);
+  const vouchers = await env.DB.prepare(`SELECT count(*) n, coalesce(sum(amount_pence), 0) p FROM vouchers WHERE created_at >= ? AND session_id NOT LIKE 'test-%'`).bind(since).first();
+  const redeemed = (await env.DB.prepare(`SELECT count(*) n FROM vouchers WHERE redeemed_at >= ? AND session_id NOT LIKE 'test-%'`).bind(since).first()).n;
   const sys = await systemsCheck(env);
   const promoUsd = Number(await kvGet(env, 'claude_usd_promo') || 0), paidUsd = Number(await kvGet(env, 'claude_usd_paid') || 0);
   const sysLine = ['prodigi', 'stripe', 'claude'].map((k) => `${k} ${sys[k].ok ? 'OK' : 'FAILING: ' + sys[k].error}`).join(' · ') + ` · etsy ${sys.etsy?.connected ? 'connected' : 'not connected'}`;
@@ -93,6 +96,8 @@ export async function weeklySummary(env) {
 
 Orders: ${count} (£${(total / 100).toFixed(2)})
 ${orders.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}
+
+Gift vouchers: ${vouchers.n} sold (£${(vouchers.p / 100).toFixed(2)}), ${redeemed} redeemed
 
 Estate agents (outreach emails this week: ${sentWeek}; office prints made: ${previews}; free framed samples used ${samples.used} of ${samples.cap}):
 ${prospects.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}

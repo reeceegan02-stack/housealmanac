@@ -31,7 +31,7 @@ export async function buildStatus(env) {
       stuck_over_3h: (await q(`SELECT id, source, status, updated_at FROM orders WHERE status IN ('new','researching','revising') AND updated_at < ?`,
         new Date(Date.now() - 3 * 3600e3).toISOString())),
     },
-    problems_7d: (await q(`SELECT at, order_id, kind, detail FROM events WHERE at >= ? AND (kind LIKE '%error%' OR kind LIKE '%fail%' OR kind IN ('alert','escalated','bounce','email_skipped_duplicate','stripe_reconciled')) ORDER BY id DESC LIMIT 40`, since7))
+    problems_7d: (await q(`SELECT at, order_id, kind, detail FROM events WHERE at >= ? AND (kind LIKE '%error%' OR kind LIKE '%fail%' OR kind IN ('alert','escalated','bounce','email_skipped_duplicate','stripe_reconciled','voucher_pdf_failed','voucher_flow_error','voucher_redeem_error','voucher_emailed_by_cron')) ORDER BY id DESC LIMIT 40`, since7))
       .map(e => ({ at: e.at, order: e.order_id, kind: e.kind, detail: scrub(e.detail) })),
     qa_7d: (await q(`SELECT at, order_id, detail FROM events WHERE kind = 'qa' AND at >= ? ORDER BY id DESC LIMIT 20`, since7)).map(e => {
       let d = {}; try { d = JSON.parse(e.detail); } catch {}
@@ -50,6 +50,7 @@ export async function buildStatus(env) {
       queue: await q(`SELECT kind, status, count(*) n FROM outbox_queue GROUP BY kind, status`).catch(() => []) },
     agents: (await q(`SELECT at, kind, detail FROM events WHERE kind IN ('agent_ops','agent_growth') ORDER BY id DESC LIMIT 6`))
       .map(e => { let d = {}; try { d = JSON.parse(e.detail); } catch {} return { at: e.at, agent: e.kind, note: scrub(d.final, 400), actions: (d.actions || []).map(a => a.tool) }; }),
+    vouchers: await q(`SELECT product, status, count(*) n FROM vouchers WHERE session_id NOT LIKE 'test-%' GROUP BY product, status`).catch(() => []),
     controls: { outreach_paused_by_agent: (await kvGet(env, 'agent_outreach_paused')) === 'true', outreach_per_day_override: await kvGet(env, 'agent_outreach_per_day') },
     claude_usd: { promo: Number(await kvGet(env, 'claude_usd_promo') || 0).toFixed(2), paid: Number(await kvGet(env, 'claude_usd_paid') || 0).toFixed(2) },
   };

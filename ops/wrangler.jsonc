@@ -12,7 +12,8 @@
   "workflows": [
     { "name": "housealmanac-order", "binding": "ORDER_FLOW", "class_name": "OrderWorkflow" },
     { "name": "housealmanac-outreach", "binding": "OUTREACH_FLOW", "class_name": "OutreachWorkflow" },
-    { "name": "housealmanac-agents", "binding": "AGENT_FLOW", "class_name": "AgentWorkflow" }
+    { "name": "housealmanac-agents", "binding": "AGENT_FLOW", "class_name": "AgentWorkflow" },
+    { "name": "housealmanac-voucher", "binding": "VOUCHER_FLOW", "class_name": "VoucherWorkflow" }
   ],
   "triggers": { "crons": ["*/30 * * * *"] },
   // In Workers Builds, copy API keys from build secrets into runtime secrets (no-op locally).

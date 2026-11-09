@@ -67,6 +67,7 @@ const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS prospects_domain ON prospects (domain)`,
   `CREATE TABLE IF NOT EXISTS outbox_queue (id TEXT PRIMARY KEY, created_at TEXT, to_email TEXT, outlet TEXT, kind TEXT, subject TEXT, text TEXT, source_url TEXT, status TEXT, sent_at TEXT)`,
   `CREATE INDEX IF NOT EXISTS outbox_queue_to ON outbox_queue (to_email)`,
+  `CREATE TABLE IF NOT EXISTS vouchers (code TEXT PRIMARY KEY, created_at TEXT, session_id TEXT UNIQUE, product TEXT, amount_pence INTEGER, buyer_email TEXT, buyer_name TEXT, recipient TEXT, from_name TEXT, message TEXT, status TEXT, expires_at TEXT, emailed_at TEXT, pdf_key TEXT, redeemed_at TEXT, order_id TEXT)`,
 ];
 
 let schemaReady = false;
@@ -115,7 +116,7 @@ export async function updateOrder(env, id, fields) {
 export const esc = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export const CODE_VERSION = '2026-11-09.20';
+export const CODE_VERSION = '2026-11-09.21';
 export function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { 'content-type': 'application/json', 'x-ha-version': CODE_VERSION } });
 }

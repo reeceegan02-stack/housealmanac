@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redeem a gift voucher — House Almanac</title>
+<meta name="description" content="Redeem your House Almanac gift voucher: enter your code and your address, and we'll research your home and email you a proof.">
+<link rel="canonical" href="https://housealmanac.co.uk/redeem">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#f6f1e7;--card:#fffdf8;--ink:#2a241e;--soft:#62584c;--rule:#ddd2bf;--brick:#9c3f2a;--brick-d:#7e3120;--bad:#a12a1a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.6 Inter,system-ui,sans-serif}
+a{color:var(--brick)}
+header{border-bottom:1px solid var(--rule)}
+header .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px}
+.logo{font:700 20px Lora,serif;color:var(--ink);text-decoration:none}
+header a.small{font-size:15px;color:var(--ink);text-decoration:none}
+h1{font:700 clamp(32px,5vw,44px)/1.15 Lora,serif;margin:44px 0 10px}
+.lead{color:var(--soft);font-size:18px;margin:0 0 26px}
+form,.done{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:26px}
+fieldset{border:0;padding:0;margin:0 0 22px}
+legend{font:700 19px Lora,serif;margin-bottom:10px;padding:0}
+label{display:block;font-size:14.5px;font-weight:600;margin:12px 0 5px}
+label span{font-weight:400;color:var(--soft)}
+input,select,textarea{width:100%;font:16px Inter,system-ui,sans-serif;color:var(--ink);background:#fff;border:1.5px solid var(--rule);border-radius:10px;padding:11px 12px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brick);outline-offset:1px;border-color:var(--brick)}
+input.code{font-size:20px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.check{display:flex;gap:10px;align-items:center;font-weight:500;margin:6px 0 0}
+.check input{width:20px;height:20px}
+.hint{font-size:13.5px;color:var(--soft);margin-top:5px}
+.btn{display:inline-block;background:var(--brick);color:#fff;border:0;cursor:pointer;padding:14px 26px;border-radius:999px;font:600 17px Inter,system-ui,sans-serif}
+.btn:hover{background:var(--brick-d)}.btn[disabled]{opacity:.6;cursor:wait}
+.err{display:none;background:#fbe9e5;border:1px solid #e3b4aa;color:var(--bad);border-radius:10px;padding:12px 14px;margin:0 0 18px;font-weight:500}
+.bad{border-color:var(--bad)}
+.done{display:none}.done h2{font:700 26px Lora,serif;margin:0 0 8px}
+.note{font-size:14px;color:var(--soft);margin:22px 0 60px}
+#elsewhere{display:none}
+@media (max-width:600px){.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><a class="logo" href="/">House Almanac</a><a class="small" href="/gift">Gift vouchers</a></div></header>
+<main class="wrap">
+<h1>Redeem your gift voucher</h1>
+<p class="lead">Enter your code and the address of the home you'd like your print to be about. We'll research it and email you a proof within 2 working days. Nothing is printed until you approve it.</p>
+
+<form id="f" novalidate>
+  <div class="err" id="err" role="alert"></div>
+  <fieldset>
+    <legend>Your voucher</legend>
+    <label for="code">Voucher code</label>
+    <input class="code" id="code" name="code" placeholder="GIFT-ABCD-2345" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+  </fieldset>
+  <fieldset>
+    <legend>About you</legend>
+    <div class="row2">
+      <div><label for="name">Your name</label><input id="name" name="name" autocomplete="name" required></div>
+      <div><label for="email">Your email <span>(for your proof)</span></label><input id="email" name="email" type="email" autocomplete="email" required></div>
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>Your home</legend>
+    <label for="line1">Address line 1</label><input id="line1" name="line1" autocomplete="address-line1" required>
+    <label for="line2">Address line 2 <span>(optional)</span></label><input id="line2" name="line2" autocomplete="address-line2">
+    <div class="row2">
+      <div><label for="town">Town or city</label><input id="town" name="town" autocomplete="address-level2" required></div>
+      <div><label for="postcode">Postcode</label><input id="postcode" name="postcode" autocomplete="postal-code" required></div>
+    </div>
+    <div class="hint">Homes in England and Wales. We'll deliver the print here unless you choose another address below.</div>
+    <label class="check"><input type="checkbox" id="deliver_elsewhere" name="deliver_elsewhere"> Deliver it to a different UK address</label>
+    <div id="elsewhere">
+      <label for="d_name">Recipient's name</label><input id="d_name" name="d_name" autocomplete="shipping name">
+      <label for="d_line1">Address line 1</label><input id="d_line1" name="d_line1" autocomplete="shipping address-line1">
+      <label for="d_line2">Address line 2 <span>(optional)</span></label><input id="d_line2" name="d_line2" autocomplete="shipping address-line2">
+      <div class="row2">
+        <div><label for="d_town">Town or city</label><input id="d_town" name="d_town" autocomplete="shipping address-level2"></div>
+        <div><label for="d_postcode">Postcode</label><input id="d_postcode" name="d_postcode" autocomplete="shipping postal-code"></div>
+      </div>
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>Your print</legend>
+    <div class="row2">
+      <div><label for="style">Style</label>
+        <select id="style" name="style"><option value="heritage">Heritage: warm paper, sepia maps</option><option value="modern">Modern: crisp white, black-line maps</option><option value="midnight">Midnight: deep navy, cream maps</option><option value="sage">Sage: soft green, terracotta</option></select></div>
+      <div><label for="move_in">Year you moved in <span>(optional)</span></label><input id="move_in" name="move_in" inputmode="numeric" maxlength="4" placeholder="e.g. 2024"></div>
+    </div>
+    <div class="hint"><a href="/#styles" target="_blank" rel="noopener">See the four styles</a></div>
+    <label for="message">Message for the print <span>(optional)</span></label>
+    <textarea id="message" name="message" rows="2" maxlength="220" placeholder="e.g. Welcome home, Sam &amp; Alex. Christmas 2026"></textarea>
+  </fieldset>
+  <button class="btn" id="go" type="submit">Redeem voucher</button>
+</form>
+
+<div class="done" id="done" role="status">
+  <h2>Thank you, you're all set.</h2>
+  <p id="doneText">We've started researching your home. Your proof will arrive by email within 2 working days.</p>
+  <p style="margin:0">If it doesn't arrive, check your spam folder or email <a href="mailto:hello@housealmanac.co.uk">hello@housealmanac.co.uk</a>.</p>
+</div>
+
+<p class="note">Questions? Email <a href="mailto:hello@housealmanac.co.uk">hello@housealmanac.co.uk</a>. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
+</main>
+<script>
+(function () {
+  var API = 'https://housealmanac-ops.reeceegan02.workers.dev/voucher/redeem';
+  var f = document.getElementById('f'), err = document.getElementById('err'), go = document.getElementById('go');
+  try { var c = new URLSearchParams(location.search).get('code'); if (c) document.getElementById('code').value = c; } catch (e) {}
+  var cb = document.getElementById('deliver_elsewhere');
+  cb.addEventListener('change', function () { document.getElementById('elsewhere').style.display = cb.checked ? 'block' : 'none'; });
+  function show(msg, field) {
+    err.textContent = msg; err.style.display = 'block';
+    [].forEach.call(f.querySelectorAll('.bad'), function (x) { x.classList.remove('bad'); });
+    var el = field && document.getElementById(field);
+    if (el) { el.classList.add('bad'); el.focus(); } else { err.scrollIntoView({ block: 'center' }); }
+  }
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    err.style.display = 'none';
+    var need = ['code', 'name', 'email', 'line1', 'town', 'postcode'];
+    for (var i = 0; i < need.length; i++) if (!document.getElementById(need[i]).value.trim()) return show('Please fill in all the required boxes.', need[i]);
+    var data = {}; new FormData(f).forEach(function (v, k) { data[k] = v; });
+    data.deliver_elsewhere = cb.checked;
+    go.disabled = true; go.textContent = 'Checking…';
+    fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false }; }); })
+      .then(function (j) {
+        if (j && j.ok) {
+          f.style.display = 'none';
+          document.getElementById('doneText').textContent = "We've started researching " + j.street + ". Your proof will arrive by email within 2 working days (order " + j.order + ").";
+          document.getElementById('done').style.display = 'block';
+          window.scrollTo(0, 0);
+        } else show((j && j.error) || 'Sorry, something went wrong. Please try again, or email hello@housealmanac.co.uk.', j && j.field);
+      })
+      .catch(function () { show('Sorry, we couldn’t reach our server. Please check your connection and try again.'); })
+      .then(function () { go.disabled = false; go.textContent = 'Redeem voucher'; });
+  });
+})();
+</script>
+</body>
+</html>

@@ -31,7 +31,9 @@ Standing approvals from Reece (9 Nov 2026): "full control" of marketing, orders,
 | Framed A3, black classic | £89 | GLOBAL-CFP-A3 (no mount, acrylic) | £51.30 (£32 + £10.75 + VAT) |
 | Estate agent completion gift | £75, then £65 (code AGENCY10 after first paid order) | as above | never below £65; always paid up front |
 Stripe payment links: framed https://buy.stripe.com/4gM14p7UJfBSffW9512wU00 · unframed https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01
-Christmas: last order date 9 December.
+Christmas: last order date 9 December (site banner switches to vouchers after that, and hides after 25 Dec).
+Gift vouchers (9 Nov): framed £89 https://buy.stripe.com/28EcN74IxdtKebS2GD2wU03 · unframed £39 https://buy.stripe.com/6oUdRb0shfBSffW1Cz2wU04
+(pages /gift and /redeem). Frame colour: black by default; white or natural on request (inbox stores ship_json.frame_colour, Prodigi gets it).
 
 ## Systems
 - Website: `site/` → Cloudflare Worker `housealmanac-web` (static assets), custom domains housealmanac.co.uk + www.
@@ -76,6 +78,12 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **Agency pricing (Reece, 9 Nov): payment always up front, no invoicing, credit or payment terms.** After an agency's first paid order the
   worker emails code AGENCY10 (Stripe coupon "Returning agency discount", £10 off, only valid on the agent product) once per agency domain
   (`ops/src/agents.js`); later pay links get &prefilled_promo_code=AGENCY10 automatically.
+- **Gift vouchers** (`ops/src/voucher.js`, `voucher-html.js`, Workflow `housealmanac-voucher`): a paid session from either voucher link
+  (matched by payment_link id, or a custom field mentioning "voucher") → D1 `vouchers` row (code GIFT-XXXX-XXXX, 12 months) → A5 PDF via
+  Browser Rendering → emailed to the buyer (cron re-sends the code as plain text if not emailed within 20 min). Recipient redeems at
+  housealmanac.co.uk/redeem → POST /voucher/redeem (CORS, 8 failed codes/hour/IP) → order source 'voucher' (nothing to pay) → normal proof
+  flow. Cancel before approval → voucher reactivated. Inbox: buyers can get their code resent; unused vouchers within 14 days are refunded
+  automatically (Stripe refund), anything else escalates. Admin: GET /admin/vouchers, POST /admin/voucher/test {email, product, recipient}.
 - **Cron every 30 min**: Prodigi tracking → "on its way" email; retry stuck orders (3 tries then alert); Stripe reconciliation (paid sessions
   with no order get created, and hello@ is warned the webhook missed them); Monday weekly summary to hello@.
 - **Admin API** (header `x-admin-key` = Worker secret ADMIN_KEY; not stored anywhere — rotate it in Worker settings if you need access):

@@ -20,7 +20,7 @@
 body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.6 Inter,system-ui,sans-serif}
 a{color:var(--brick)}
 .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
-.xmas{background:var(--brick);color:#fff;text-align:center;font-size:14.5px;padding:8px 16px;line-height:1.4}.xmas a{color:#fff;font-weight:600}
+.xbar{background:var(--brick);color:#fff;text-align:center;font-size:14.5px;padding:8px 16px;line-height:1.4}.xbar a{color:#fff;font-weight:600}
 header{border-bottom:1px solid var(--rule);background:var(--paper);position:sticky;top:0;z-index:5}
 header .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
 .logo{font:700 20px Lora,serif;letter-spacing:.01em;color:var(--ink);text-decoration:none}
@@ -85,9 +85,9 @@ footer a{color:var(--soft);margin-right:16px}
 </style>
 </head>
 <body>
-<div class="xmas" id="xmas">Christmas gift? <strong>Order by 9 December</strong> to have it with you before Christmas. You approve a proof first. <a href="#prices">See prices</a></div>
-<script>try{if(new Date()>new Date("2026-12-10T00:00:00Z"))document.getElementById("xmas").remove()}catch(e){}</script>
-<header><div class="wrap"><a class="logo" href="/">House Almanac</a><nav><a href="#how">How it works</a><a href="#prices">Prices</a><a href="#agents">Estate agents</a><a class="btn" href="#prices">Order</a></nav></div></header>
+<div class="xbar" id="xbar">Christmas gift? <strong>Order by 9 December</strong> for delivery before Christmas, or give a <a href="/gift">gift voucher</a>, emailed instantly.</div>
+<script>try{var b=document.getElementById("xbar"),n=new Date();if(n>new Date("2026-12-26T00:00:00Z"))b.remove();else if(n>new Date("2026-12-10T00:00:00Z"))b.innerHTML='Too late for Christmas delivery? Give a <a href="/gift">gift voucher</a>: it arrives by email in minutes, ready to print.'}catch(e){}</script>
+<header><div class="wrap"><a class="logo" href="/">House Almanac</a><nav><a href="#how">How it works</a><a href="#prices">Prices</a><a href="/gift">Gift vouchers</a><a href="#agents">Estate agents</a><a class="btn" href="#prices">Order</a></nav></div></header>
 
 <main>
 <div class="wrap hero">
@@ -120,7 +120,7 @@ footer a{color:var(--soft);margin-right:16px}
   </ul>
 </div></section>
 
-<section><div class="wrap">
+<section id="styles"><div class="wrap">
   <div class="eyebrow">Four styles</div>
   <h2>Pick the look that suits your walls.</h2>
   <div class="styles">
@@ -140,7 +140,7 @@ footer a{color:var(--soft);margin-right:16px}
     <div class="card"><div class="num">2</div><h3>Approve your proof</h3><p>Within 2 working days we email a digital proof. Ask for changes, or reply to approve.</p></div>
     <div class="card"><div class="num">3</div><h3>Printed and delivered</h3><p>Printed in the UK on 200gsm fine art paper, framed, and delivered free in 3–5 working days.</p></div>
   </div>
-  <div class="xmas" style="margin-top:28px"><div><b>Ordering for Christmas?</b><br>Order by Wednesday 9 December and approve your proof promptly for delivery before Christmas.</div><a class="btn" href="https://buy.stripe.com/4gM14p7UJfBSffW9512wU00">Order now</a></div>
+  <div class="xmas" style="margin-top:28px"><div><b>Ordering for Christmas?</b><br>Order by Wednesday 9 December and approve your proof promptly for delivery before Christmas. Short of time, or don't know their address? Give a <a href="/gift" style="color:#f6f1e7">gift voucher</a>, emailed instantly.</div><a class="btn" href="https://buy.stripe.com/4gM14p7UJfBSffW9512wU00">Order now</a></div>
 </div></section>
 
 <section id="prices"><div class="wrap">
@@ -151,7 +151,8 @@ footer a{color:var(--soft);margin-right:16px}
     <div class="card price"><h3>A3 print, unframed</h3><div class="amt">£39</div><p>The same print on 200gsm fine art paper, sent flat, ready for your own frame. Free UK delivery.</p><a class="btn ghost" href="https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01">Order the print</a></div>
     <div class="card price"><h3>Estate agents</h3><div class="amt" style="font-size:30px">from £65</div><p>Agency-branded completion gifts, delivered to your branch, with a QR code for reviews.</p><a class="btn ghost" href="#agents">Find out more</a></div>
   </div>
-  <p class="note" style="margin-top:18px">Prints are made for addresses in England and Wales and delivered within the UK. Payments are handled securely by Stripe; we never see your card details.</p>
+  <p style="margin-top:22px"><strong>Giving it as a gift?</strong> <a href="/gift">Gift vouchers</a> (£89 framed, £39 unframed) arrive by email in minutes as a printable PDF, and they redeem it with their own address.</p>
+  <p class="note" style="margin-top:10px">Prints are made for addresses in England and Wales and delivered within the UK. Payments are handled securely by Stripe; we never see your card details.</p>
 </div></section>
 
 <section id="agents" class="agents"><div class="wrap grid2">
@@ -177,6 +178,7 @@ footer a{color:var(--soft);margin-right:16px}
   <details><summary>What if my house is new?</summary><p>That's often the best story. The old map shows what stood on your plot before: fields, a mill, a railway yard. You'll see it all on your proof before anything is printed.</p></details>
   <details><summary>Do you use AI?</summary><p>Yes, to help research and draft. Every fact on a print comes from a named source, and you see and approve a proof before anything is printed. If we get a fact wrong, we reprint free.</p></details>
   <details><summary>Will my purchase price be on the print?</summary><p>No. The sales chart shows recorded sales on the street with house numbers left off, and your own home's sales are never shown.</p></details>
+  <details><summary>Can I give it as a gift if I don't know their address?</summary><p>Yes: buy a <a href="/gift">gift voucher</a>. It's emailed to you straight away as a printable PDF, and they redeem it at housealmanac.co.uk/redeem with their address. Vouchers are valid for 12 months.</p></details>
   <details><summary>Can I return it?</summary><p>Each print is made to order for your address, so the usual 14-day change-of-mind right doesn't apply once you've approved your proof. You can cancel for a full refund before you approve it. If it arrives damaged or faulty, or contains a factual error, we replace it free. <a href="/returns">Full returns policy</a>.</p></details>
   <details><summary>Why "House Almanac"?</summary><p>An almanac is a book of dates, records and facts, like the old farmers' almanacs. Ours is that for one house: its maps, its timeline, its story and the sales on its street, gathered in one place and framed for the wall.</p></details>
   <details><summary>How do I get in touch?</summary><p>Email <a href="mailto:hello@housealmanac.co.uk">hello@housealmanac.co.uk</a>. We reply within one working day.</p></details>
@@ -185,7 +187,7 @@ footer a{color:var(--soft);margin-right:16px}
 
 <footer><div class="wrap">
   <div>House Almanac · Manchester, United Kingdom · <a href="/terms">Legal details</a><br>Email <a href="mailto:hello@housealmanac.co.uk">hello@housealmanac.co.uk</a> · Historic maps reproduced with the permission of the National Library of Scotland (CC-BY).</div>
-  <div><a href="/agents">Estate agents</a><a href="https://www.etsy.com/shop/HouseAlmanac" rel="noopener">Etsy shop</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/returns">Returns</a></div>
+  <div><a href="/gift">Gift vouchers</a><a href="/agents">Estate agents</a><a href="https://www.etsy.com/shop/HouseAlmanac" rel="noopener">Etsy shop</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/returns">Returns</a></div>
 </div></footer>
 </body>
 </html>

@@ -3,8 +3,9 @@ export const KB = `House Almanac (housealmanac.co.uk) makes personalised A3 prin
 Trading name of Reece Egan-Sheath, a sole trader in Manchester. Email: hello@housealmanac.co.uk. Not VAT-registered.
 
 Products and prices (free UK delivery included):
-- Framed A3 (black classic frame, acrylic glazing, ready to hang): £89. Order: https://buy.stripe.com/4gM14p7UJfBSffW9512wU00
+- Framed A3 (black classic frame as standard, or white or natural wood at no extra cost: they just say which when they approve the proof; acrylic glazing, ready to hang): £89. Order: https://buy.stripe.com/4gM14p7UJfBSffW9512wU00
 - Unframed A3 print on 200gsm matte art paper: £39. Order: https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01
+- Gift vouchers (https://housealmanac.co.uk/gift): framed £89 (https://buy.stripe.com/28EcN74IxdtKebS2GD2wU03) or unframed £39 (https://buy.stripe.com/6oUdRb0shfBSffW1Cz2wU04). Emailed to the buyer straight away as a printable PDF with a code (GIFT-XXXX-XXXX), so they can be bought right up to Christmas Day, after the 9 December order date. Valid 12 months. The recipient redeems it at https://housealmanac.co.uk/redeem with their address, then gets a proof to approve as normal. Unused vouchers can be refunded within 14 days of purchase. Lost voucher: we resend the code to the buyer's email. A voucher covers one print; no cash alternative.
 - Also on Etsy (shop HouseAlmanac).
 - Estate agents: completion gifts, framed and delivered to the branch, with the agency's logo and a QR code to their review page. £75 per print, paid online up front (https://buy.stripe.com/00w14pgrf75m1p62GD2wU02). After an agency's first paid order we email them code AGENCY10 for £10 off every later print (£65). Always paid up front per print: no monthly invoicing, credit accounts or payment terms. Agents send the buyer's new address and their message, we email a free proof, they pay when they approve. Details: https://housealmanac.co.uk/agents
 - Four styles: Heritage (default), Modern, Midnight, Sage.
@@ -12,7 +13,7 @@ Products and prices (free UK delivery included):
 
 What's on a print: the street on an Ordnance Survey 25-inch map from around 1890-1914 (National Library of Scotland), the same area on today's map (OpenStreetMap), a short history of the street, a timeline, recorded house prices on the street from HM Land Registry (house numbers and the customer's own home's sales are left off), and a personal message.
 
-Process and timing: proof by email within 2 working days of ordering. The customer replies "approved" or asks for changes (unlimited reasonable changes). After approval, printing and dispatch take 2-4 working days, then 1-2 days delivery. Christmas: order by 9 December.
+Process and timing: proof by email within 2 working days of ordering. The customer replies "approved" or asks for changes (unlimited reasonable changes). After approval, printing and dispatch take 2-4 working days, then 1-2 days delivery. Christmas: order by 9 December for delivery before Christmas; after that, a gift voucher.
 
 Policies: personalised items can't be returned for change of mind once the proof is approved (Consumer Contracts Regulations exemption). Before approval, an order can be cancelled for a full refund. Damaged or faulty prints are replaced free (ask for a photo). Factual errors are reprinted free within 60 days.
 Press, bloggers, local groups and partners we've pitched may have a free digital print of a street of their choice (they send the address); if they want it framed it's £89.

@@ -13,8 +13,9 @@ import { runScheduled, weeklySummary } from './cron.js';
 import { sendMail, orderReceivedEmail, approvedEmail } from './mail.js';
 import { createPrintOrder } from './prodigi.js';
 import { etsyConnect, etsyCallback, pollEtsy } from './etsy.js';
+import { VoucherWorkflow, redeemVoucher } from './voucher.js';
 
-export { OrderWorkflow, OutreachWorkflow, AgentWorkflow };
+export { OrderWorkflow, OutreachWorkflow, AgentWorkflow, VoucherWorkflow };
 
 export default {
   async fetch(req, env, ctx) {
@@ -39,6 +40,7 @@ export default {
       }
 
       if (p === '/stripe/webhook' && req.method === 'POST') return stripeWebhook(req, env, ctx);
+      if (p === '/voucher/redeem') return redeemVoucher(req, env); // from housealmanac.co.uk/redeem (CORS)
       if (p === '/etsy/connect') { await ensureSchema(env); return etsyConnect(env); }
       if (p === '/etsy/callback') { await ensureSchema(env); return etsyCallback(env, url); }
 
@@ -146,6 +148,17 @@ async function admin(req, env, url) {
   if (p === '/outreach/run' && req.method === 'POST') return json(await startDailyOutreach(env, new Date()));
   if (p === '/outreach/find' && req.method === 'POST') return json(await findProspects(env, body.area));
   if (p === '/samples') return json(await samplesStatus(env));
+  if (p === '/vouchers') return json((await env.DB.prepare('SELECT * FROM vouchers ORDER BY created_at DESC LIMIT 100').all()).results);
+  if (p === '/voucher/test' && req.method === 'POST') {
+    // A voucher without a Stripe payment (session_id 'test-...'), to check the PDF, the email and redemption.
+    const { createVoucherFromSession } = await import('./voucher.js');
+    const fake = { id: 'test-' + Date.now(), amount_total: 0, payment_link: null, customer_details: { email: body.email || 'hello@housealmanac.co.uk', name: body.name || 'Test Buyer' },
+      custom_fields: [['Who is it for? (name on the voucher)', body.recipient], ['From (your name on the voucher)', body.from_name], ['Short message on the voucher', body.message]]
+        .map(([l, v]) => ({ label: { custom: l }, text: { value: v || '' } })) };
+    const r = await createVoucherFromSession(env, fake);
+    if (body.product === 'unframed' || body.product === 'framed') await env.DB.prepare('UPDATE vouchers SET product = ? WHERE code = ?').bind(body.product, r.voucher).run();
+    return json(r);
+  }
   if (p === '/outreach/preview' && req.method === 'POST') {
     const pr = await env.DB.prepare('SELECT * FROM prospects WHERE email = ?').bind(String(body.email || '').toLowerCase()).first();
     return pr ? json(await startPreview(env, pr)) : json({ error: 'no such prospect' }, 404);
