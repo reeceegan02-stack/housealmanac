@@ -26,9 +26,12 @@ export async function createPrintOrder(env, order, imageUrl) {
   const ship = JSON.parse(order.ship_json || '{}');
   const sku = SKUS[order.product] || SKUS.framed;
   const attrsAvail = await productAttributes(env, sku);
+  // Specify every attribute the product has: black for the frame colour, otherwise its only/first option.
   const attributes = {};
-  if (attrsAvail.color) attributes.color = attrsAvail.color.includes('black') ? 'black' : attrsAvail.color[0];
-  if (attrsAvail.colour) attributes.colour = attrsAvail.colour.includes('black') ? 'black' : attrsAvail.colour[0];
+  for (const [k, opts] of Object.entries(attrsAvail)) {
+    if (!Array.isArray(opts) || !opts.length) continue;
+    attributes[k] = /^colou?r$/i.test(k) && opts.includes('black') ? 'black' : opts[0];
+  }
   const body = {
     merchantReference: order.id,
     shippingMethod: 'Standard',
