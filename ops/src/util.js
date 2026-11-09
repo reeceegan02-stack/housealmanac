@@ -54,10 +54,21 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)`,
 ];
 
+// Additive changes to existing tables (each runs once; "duplicate column" errors are ignored).
+const MIGRATIONS = [
+  `ALTER TABLE prospects ADD COLUMN domain TEXT`,
+  `ALTER TABLE prospects ADD COLUMN website TEXT`,
+  `ALTER TABLE prospects ADD COLUMN created_at TEXT`,
+  `UPDATE prospects SET domain = lower(substr(email, instr(email, '@') + 1)) WHERE domain IS NULL`,
+  `CREATE INDEX IF NOT EXISTS prospects_status ON prospects (status)`,
+  `CREATE INDEX IF NOT EXISTS prospects_domain ON prospects (domain)`,
+];
+
 let schemaReady = false;
 export async function ensureSchema(env) {
   if (schemaReady) return;
   for (const s of SCHEMA) await env.DB.prepare(s).run();
+  for (const m of MIGRATIONS) { try { await env.DB.prepare(m).run(); } catch (e) { /* already applied */ } }
   schemaReady = true;
 }
 

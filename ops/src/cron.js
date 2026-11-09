@@ -8,12 +8,13 @@ import { reconcileStripe } from './stripe-orders.js';
 import { systemsCheck } from './check.js';
 import { PREPAID_USD } from './claude.js';
 import { kvGet, kvSet } from './util.js';
+import { startDailyOutreach, samplesStatus } from './outreach.js';
 
 export async function runScheduled(event, env) {
   await ensureSchema(env);
   const d = new Date(event.scheduledTime || Date.now());
   const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env)];
-  if (d.getUTCHours() === 9 && d.getUTCMinutes() < 30) jobs.push(agentFollowUps(env));
+  if (d.getUTCHours() === 10 && d.getUTCMinutes() < 30) jobs.push(startDailyOutreach(env, d));
   if (d.getUTCDay() === 1 && d.getUTCHours() === 8 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env));
   const results = await Promise.allSettled(jobs);
   for (const r of results) if (r.status === 'rejected') await logEvent(env, null, 'cron_error', String(r.reason?.message || r.reason));
@@ -28,7 +29,7 @@ async function checkShipping(env) {
       if (ship) {
         const tracking = { url: ship.tracking.url, number: ship.tracking.number, carrier: ship.carrier?.name };
         await updateOrder(env, o.id, { status: 'shipped', tracking: JSON.stringify(tracking) });
-        const to = o.source === 'agent-sample' ? (JSON.parse(o.ship_json || '{}').agent_email || o.email) : o.email;
+        const to = o.source.startsWith('agent-') ? (JSON.parse(o.ship_json || '{}').agent_email || o.email) : o.email;
         const t = shippedEmail(o, tracking);
         if (o.source === 'etsy') await etsyMarkShipped(env, o, tracking);
         if (to) await sendMail(env, { to, subject: t.subject, text: t.text, orderId: o.id });
@@ -69,34 +70,13 @@ async function creditWatch(env) {
   });
 }
 
-async function agentFollowUps(env) {
-  const today = new Date().toISOString().slice(0, 10);
-  const { results } = await env.DB.prepare(`SELECT * FROM prospects WHERE status = 'emailed' AND followup_due IS NOT NULL AND followup_due <= ?`).bind(today).all();
-  for (const p of results) {
-    const agency = p.agency || 'your';
-    await sendMail(env, {
-      to: p.email, fromName: 'Reece Egan-Sheath | House Almanac',
-      subject: `Re: A completion gift for ${agency} buyers`,
-      text: `Hi ${agency} team,
-
-Just bringing this back to the top of your inbox. The free sample offer stands for any buyer completing with you before Christmas. Reply with their new address and I'll send you a proof within 2 working days.
-
-Example and prices: https://housealmanac.co.uk/agents
-
-Reece
-House Almanac · hello@housealmanac.co.uk
-
-If this isn't for you, reply "no thanks" and I won't email again.`,
-    });
-    await env.DB.prepare(`UPDATE prospects SET status = 'followed_up', last_contact = ? WHERE email = ?`).bind(now(), p.email).run();
-  }
-}
-
 export async function weeklySummary(env) {
   const since = new Date(Date.now() - 7 * 86400e3).toISOString();
   const orders = await env.DB.prepare(`SELECT status, count(*) n, sum(amount_pence) p FROM orders WHERE created_at >= ? GROUP BY status`).bind(since).all();
   const attention = await env.DB.prepare(`SELECT id, address, notes FROM orders WHERE status = 'needs_attention'`).all();
   const prospects = await env.DB.prepare(`SELECT status, count(*) n FROM prospects GROUP BY status`).all();
+  const sentWeek = (await env.DB.prepare(`SELECT count(*) n FROM events WHERE kind = 'email_sent' AND at >= ? AND detail LIKE '%completion gift%'`).bind(since).first()).n;
+  const samples = await samplesStatus(env);
   const sys = await systemsCheck(env);
   const promoUsd = Number(await kvGet(env, 'claude_usd_promo') || 0), paidUsd = Number(await kvGet(env, 'claude_usd_paid') || 0);
   const sysLine = ['prodigi', 'stripe', 'claude'].map((k) => `${k} ${sys[k].ok ? 'OK' : 'FAILING: ' + sys[k].error}`).join(' · ') + ` · etsy ${sys.etsy?.connected ? 'connected' : 'not connected'}`;
@@ -107,7 +87,7 @@ export async function weeklySummary(env) {
 Orders: ${count} (£${(total / 100).toFixed(2)})
 ${orders.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}
 
-Estate agents:
+Estate agents (outreach emails this week: ${sentWeek}; free framed samples used ${samples.used} of ${samples.cap}):
 ${prospects.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}
 
 Systems: ${sysLine}

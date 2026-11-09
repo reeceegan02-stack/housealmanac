@@ -2,6 +2,7 @@
 import { OrderWorkflow } from './workflow.js';
 import { ingestStripeSession, reconcileStripe } from './stripe-orders.js';
 import { systemsCheck } from './check.js';
+import { OutreachWorkflow, startDailyOutreach, findProspects, samplesStatus } from './outreach.js';
 import { ensureSchema, json, getOrder, logEvent, updateOrder, now, fileUrl } from './util.js';
 import { verifyStripe, stripeGet, sessionToOrder } from './stripe.js';
 import { createOrder, startOrderWorkflow } from './orders.js';
@@ -11,7 +12,7 @@ import { sendMail, orderReceivedEmail, approvedEmail } from './mail.js';
 import { createPrintOrder } from './prodigi.js';
 import { etsyConnect, etsyCallback, pollEtsy } from './etsy.js';
 
-export { OrderWorkflow };
+export { OrderWorkflow, OutreachWorkflow };
 
 export default {
   async fetch(req, env, ctx) {
@@ -130,5 +131,8 @@ async function admin(req, env, url) {
   if (p === '/etsy/poll' && req.method === 'POST') return json(await pollEtsy(env));
   if (p === '/stripe/reconcile' && req.method === 'POST') return json(await reconcileStripe(env));
   if (p === '/check') return json(await systemsCheck(env));
+  if (p === '/outreach/run' && req.method === 'POST') return json(await startDailyOutreach(env, new Date()));
+  if (p === '/outreach/find' && req.method === 'POST') return json(await findProspects(env, body.area));
+  if (p === '/samples') return json(await samplesStatus(env));
   return json({ error: 'unknown admin route' }, 404);
 }

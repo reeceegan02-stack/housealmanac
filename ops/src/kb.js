@@ -6,7 +6,7 @@ Products and prices (free UK delivery included):
 - Framed A3 (black classic frame, acrylic glazing, ready to hang): £89. Order: https://buy.stripe.com/4gM14p7UJfBSffW9512wU00
 - Unframed A3 print on 200gsm matte art paper: £39. Order: https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01
 - Also on Etsy (shop HouseAlmanac).
-- Estate agents: completion gifts, £75 per framed print, or £65 each for 10+ a quarter, invoiced monthly, delivered to the branch, agency logo and a QR code to their review page. Details: https://housealmanac.co.uk/agents
+- Estate agents: completion gifts, £75 per framed print (pay online: https://buy.stripe.com/00w14pgrf75m1p62GD2wU02), or £65 each for 10+ a quarter (invoiced monthly; Reece confirms these accounts personally), delivered to the branch, with the agency's logo and a QR code to their review page. Agents send the buyer's new address and their message, we email a proof, then print. Details: https://housealmanac.co.uk/agents
 - Four styles: Heritage (default), Modern, Midnight, Sage.
 - UK delivery only for now. England and Wales addresses.
 

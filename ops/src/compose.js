@@ -1,4 +1,5 @@
 // Builds the A3 print as an HTML page (297 x 420 mm) ready for headless-browser rendering.
+import qrcode from 'qrcode-generator';
 import { esc, BRAND } from './util.js';
 import { project, metersPerPixel, haversine, nlsTileUrl } from './geo.js';
 
@@ -159,7 +160,31 @@ export function salesStrip(sales, nowYear = new Date().getFullYear()) {
   return { svg, caption: `${clean.length} recorded sales. House numbers and this home's own sales are left off.`, n: clean.length, from: y0 };
 }
 
-export function composeHtml({ data, geo, lines, histLayer, todayTiles, sales, style, message, fontScale = 1 }) {
+// QR code as a crisp SVG (black modules on white), sized by its container.
+export function qrSvg(url) {
+  const q = qrcode(0, 'M');
+  q.addData(url);
+  q.make();
+  const n = q.getModuleCount();
+  let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+  return `<svg viewBox="-2 -2 ${n + 4} ${n + 4}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" style="width:100%;height:100%;display:block;background:#fff"><path d="${d}" fill="#111"/></svg>`;
+}
+
+// Estate-agent prints: logo (or name) and a QR code to their reviews, inside the message box.
+function agentBlock(agent) {
+  if (!agent) return '';
+  const logo = agent.logoUrl
+    ? `<img src="${esc(agent.logoUrl)}" alt="" style="max-width:30mm;max-height:12mm;object-fit:contain;display:block">`
+    : `<div class="label" style="text-align:center;line-height:1.3">${esc(agent.name || '')}</div>`;
+  const qr = agent.reviewUrl
+    ? `<div style="display:flex;flex-direction:column;align-items:center;gap:.8mm"><div style="width:15mm;height:15mm">${qrSvg(agent.reviewUrl)}</div><div class="src" style="font-size:5.5pt;white-space:nowrap">Review us</div></div>`
+    : '';
+  return `<div style="display:flex;align-items:center;gap:4mm;flex:0 0 auto;margin-left:4mm;padding-left:4mm;border-left:.25mm solid currentColor;opacity:.95">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:1mm;max-width:32mm"><div class="src" style="font-size:5.5pt">With best wishes from</div>${logo}</div>${qr}</div>`;
+}
+
+export function composeHtml({ data, geo, lines, histLayer, todayTiles, sales, style, message, fontScale = 1, agent = null }) {
   const theme = THEMES[normaliseStyle(style)];
   const heroBox = { w: 265 * MM, h: 178.2 * MM };
   const todayBox = { w: 128 * MM, h: 85.3 * MM };
@@ -249,9 +274,11 @@ p.body:first-of-type::first-letter{font-family:'Lora',serif;font-weight:700;floa
   <div class="cap" style="margin-top:1mm">${esc(strip.caption)}</div>
 </div>
 
-<div class="abs msgbox" style="left:153mm;top:372mm;width:128mm;height:30mm;border:.35mm solid var(--ink);padding:4mm 6mm;display:flex;flex-direction:column;justify-content:center">
-  <div class="msg" id="msg">${msg}</div>
-  <div class="label acc" style="margin-top:2.4mm">${esc(data.message_label)}</div>
+<div class="abs msgbox" style="left:153mm;top:372mm;width:128mm;height:30mm;border:.35mm solid var(--ink);padding:4mm 6mm;display:flex;flex-direction:row;align-items:center">
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center">
+    <div class="msg" id="msg">${msg}</div>
+    <div class="label acc" style="margin-top:2.4mm">${esc(data.message_label)}</div>
+  </div>${agentBlock(agent)}
 </div>
 
 <div class="abs hair" style="left:16mm;right:16mm;top:406mm"></div>

@@ -1,6 +1,6 @@
 // Handles mail to hello@housealmanac.co.uk: keeps a copy in Gmail, then answers or acts on it.
 import PostalMime from 'postal-mime';
-import { BRAND, ensureSchema, getOrder, updateOrder, logEvent, extractJson, now, fileUrl } from './util.js';
+import { BRAND, ensureSchema, getOrder, updateOrder, logEvent, extractJson, now, fileUrl, kvGet, kvSet } from './util.js';
 import { claude, MODELS } from './claude.js';
 import { KB } from './kb.js';
 import { sendMail, approvedEmail, firstName } from './mail.js';
@@ -29,6 +29,10 @@ export async function handleInbound(message, env, ctx) {
     await logEvent(env, null, 'inbox_own', { subject, forwarded });
     return;
   }
+  if (/mailer-daemon|postmaster/i.test(from) || /undeliver|delivery status notification|returned mail|delivery failure/i.test(subject)) {
+    await handleBounce(env, (mail.text || htmlToText(mail.html || '')).toLowerCase(), subject);
+    return;
+  }
   if (IGNORE_FROM.test(from) || (autoSubmitted && autoSubmitted !== 'no') || /bulk|list|junk/.test(precedence)) {
     await logEvent(env, null, 'inbox_ignored', { from, subject });
     return;
@@ -49,14 +53,14 @@ export async function handleInbound(message, env, ctx) {
     order = await env.DB.prepare(`SELECT * FROM orders WHERE lower(email) = ? AND status NOT IN ('cancelled','delivered') ORDER BY created_at DESC LIMIT 1`).bind(from).first();
   }
   if (!order) {
-    order = await env.DB.prepare(`SELECT * FROM orders WHERE source = 'agent-sample' AND lower(json_extract(ship_json,'$.agent_email')) = ? AND status NOT IN ('cancelled','delivered') ORDER BY created_at DESC LIMIT 1`).bind(from).first();
+    order = await env.DB.prepare(`SELECT * FROM orders WHERE source LIKE 'agent-%' AND lower(json_extract(ship_json,'$.agent_email')) = ? AND status NOT IN ('cancelled','delivered') ORDER BY created_at DESC LIMIT 1`).bind(from).first();
   }
   if (order) return handleOrderMail(env, order, { from, subject, body, attachments: mail.attachments || [] });
 
   // 2. Estate agent prospect?
   const domain = from.split('@')[1] || '';
   const prospect = await env.DB.prepare(`SELECT * FROM prospects WHERE lower(email) = ? OR (? != '' AND lower(email) LIKE ?)`).bind(from, domain, '%@' + domain).first();
-  if (prospect) return handleAgentMail(env, prospect, { from, subject, body });
+  if (prospect) return handleAgentMail(env, prospect, { from, subject, body, images: (mail.attachments || []).filter(a => /^image\/(png|jpe?g|gif|webp|svg)/.test(a.mimeType || '')) });
 
   // 3. General enquiry.
   return handleGeneral(env, { from, subject, body, name: mail.from?.name });
@@ -79,6 +83,46 @@ Classify the email and draft a reply. JSON only:
   const c = extractJson(text);
   await logEvent(env, order.id, 'inbox_classified', c);
 
+  // Agent sent their logo (explicitly, i.e. replying to a proof) or a reviews link: add them and re-render once.
+  if (order.source.startsWith('agent-') && ['proof_sent', 'needs_attention'].includes(order.status) && c.intent !== 'changes') {
+    const ship = JSON.parse(order.ship_json || '{}');
+    const domain = String(ship.agent_domain || m.from.split('@')[1] || '').toLowerCase();
+    const imgs = m.attachments.filter(a => /^image\//.test(a.mimeType || '') && !/inline/i.test(a.disposition || ''));
+    const wantsLogo = /logo/i.test(m.body) && imgs.length;
+    const review = (m.body.match(REVIEW_RE) || [])[0];
+    const prevReview = await kvGet(env, 'review-' + domain);
+    let branded = false;
+    if (wantsLogo && await saveAgentLogo(env, domain, imgs, true)) branded = true;
+    if (review && review !== prevReview) { await kvSet(env, 'review-' + domain, review); branded = true; }
+    if (branded) {
+      const rev = (order.revision || 0) + 1;
+      await updateOrder(env, order.id, { revision: rev, status: 'revising', change_notes: '' });
+      await startOrderWorkflow(env, order.id, 'rerender', rev);
+      await sendMail(env, { to: m.from, orderId: order.id, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, fromName: 'Reece Egan-Sheath | House Almanac',
+        text: `Hi,\n\nThank you. We're adding ${wantsLogo ? 'your logo' : ''}${wantsLogo && review ? ' and ' : ''}${review ? 'the QR code to your reviews' : ''} now and will send you the updated proof shortly.\n\nBest wishes,\nReece\nHouse Almanac` });
+      return;
+    }
+  }
+
+  if (c.intent === 'approve' && order.source === 'agent-proof' && ['proof_sent', 'needs_attention'].includes(order.status) && order.file_key) {
+    // Free digital proof for an agent: approval means "we'd like it", so send the £75 payment link.
+    const link = `${env.AGENT_LINK}?client_reference_id=${order.id}&prefilled_email=${encodeURIComponent(m.from)}`;
+    await updateOrder(env, order.id, { status: 'awaiting_payment' });
+    await sendMail(env, {
+      to: m.from, orderId: order.id, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, fromName: 'Reece Egan-Sheath | House Almanac',
+      text: `Hi,
+
+Great, thank you. To have it printed, framed and delivered to your branch, it's £75 here (card, Apple Pay or Google Pay):
+${link}
+
+As soon as it's paid we send it to print, and it's dispatched within 2 to 4 working days with tracking. Your receipt comes from Stripe.
+
+Best wishes,
+Reece
+House Almanac`,
+    });
+    return;
+  }
   if (c.intent === 'approve' && ['proof_sent', 'needs_attention'].includes(order.status) && order.file_key) {
     await updateOrder(env, order.id, { status: 'approved' });
     try {
@@ -129,42 +173,94 @@ Classify the email and draft a reply. JSON only:
 }
 
 async function handleAgentMail(env, prospect, m) {
-  const samplesLeft = Math.max(0, Number(env.FREE_SAMPLES_CAP || 5) - (await totalSamples(env)));
+  const { samplesStatus } = await import('./outreach.js');
+  const samples = await samplesStatus(env);
+  const offer = samples.left > 0
+    ? `We offered this agency one free framed print for a buyer completing with them (${samples.left} free framed samples left in total).`
+    : `Free framed samples have all been claimed for now, so we offer a free digital proof for one of their buyers instead; the framed print is then £75 delivered to their branch. Don't offer a free framed print.`;
   const { text } = await claude(env, {
-    model: MODELS.research, maxTokens: 1400,
-    system: `You handle email from estate agents for House Almanac, replying as Reece. Business facts:\n${KB}\n\nWe emailed this agency offering one free framed sample print for a buyer completing with them (${samplesLeft} free samples left in total). Be warm, brief, professional, British English, plain text. Never offer prices below £65 per print.`,
+    model: MODELS.research, maxTokens: 1500,
+    system: `You handle email from estate agents for House Almanac, replying as Reece. Business facts:\n${KB}\n\n${offer} Be warm, brief, professional, British English, plain text. Never offer prices below £65 per print.`,
     messages: [{ role: 'user', content: `Agency: ${prospect.agency} (${prospect.email}), status ${prospect.status}.
-Email from ${m.from}, subject "${m.subject}":
+Email from ${m.from}, subject "${m.subject}", ${m.images.length} image attachment(s):
 """${m.body}"""
 
 JSON only:
 {"intent": "sample_with_details" | "interested" | "question" | "not_interested" | "other",
- "sample": {"buyer_new_address": "", "completion_date": "", "message_on_print": "", "branch_name": "", "branch_line1": "", "branch_line2": "", "branch_city": "", "branch_postcode": ""},
- "reply": "reply to send; if they want the free sample but details are missing, ask for: buyer's new address, completion date, the message for the print (e.g. 'Welcome home, Sam & Alex, from everyone at <agency>'), and the branch delivery address. Empty if not_interested."}` }],
+ "sample": {"buyer_new_address": "", "completion_date": "", "message_on_print": "", "branch_name": "", "branch_line1": "", "branch_line2": "", "branch_city": "", "branch_postcode": "", "review_url": ""},
+ "reply": "reply to send; if they want the sample/proof but details are missing, ask for: buyer's new address, completion date, the message for the print (e.g. 'Welcome home, Sam & Alex, from everyone at <agency>'), the branch delivery address, and optionally their logo (attached) and a link to their Google reviews page for the QR code. Empty if not_interested."}
+"sample_with_details" needs at least the buyer's new address with postcode and the branch postcode.` }],
   });
   const c = extractJson(text);
   await logEvent(env, null, 'agent_mail', { agency: prospect.agency, intent: c.intent });
 
   if (c.intent === 'not_interested') {
-    await env.DB.prepare(`UPDATE prospects SET status = 'opted_out', last_contact = ? WHERE email = ?`).bind(now(), prospect.email).run();
+    await env.DB.prepare(`UPDATE prospects SET status = 'opted_out', last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), prospect.email).run();
     return;
   }
   const s = c.sample || {};
-  if (c.intent === 'sample_with_details' && s.buyer_new_address && s.branch_postcode && samplesLeft > 0) {
+  const domain = prospect.domain || (prospect.email.split('@')[1] || '').toLowerCase();
+  await saveAgentLogo(env, domain, m.images);
+  if (s.review_url) await kvSet(env, 'review-' + domain, s.review_url);
+
+  if (c.intent === 'sample_with_details' && s.buyer_new_address && s.branch_postcode) {
+    const free = samples.left > 0;
     const { createOrder } = await import('./orders.js');
     const order = await createOrder(env, {
-      source: 'agent-sample', email: m.from, name: prospect.agency, product: 'framed', amount_pence: 0,
+      source: free ? 'agent-sample' : 'agent-proof', email: m.from, name: prospect.agency, product: 'framed', amount_pence: 0,
       address: s.buyer_new_address, message: s.message_on_print || `Welcome home, from everyone at ${prospect.agency}`,
       move_in: (s.completion_date || '').match(/\d{4}/)?.[0] || String(new Date().getFullYear()), style: 'heritage',
-      ship_json: JSON.stringify({ name: s.branch_name || prospect.agency, line1: s.branch_line1, line2: s.branch_line2, city: s.branch_city, postcode: s.branch_postcode, agent_email: m.from }),
+      ship_json: JSON.stringify({ name: s.branch_name || prospect.agency, line1: s.branch_line1, line2: s.branch_line2, city: s.branch_city, postcode: s.branch_postcode, agent_email: m.from, agent_domain: domain, review_url: s.review_url || undefined }),
       external_ref: null,
     });
-    await env.DB.prepare(`UPDATE prospects SET status = 'sample_in_progress', samples_used = samples_used + 1, last_contact = ? WHERE email = ?`).bind(now(), prospect.email).run();
-    await sendMail(env, { to: m.from, subject: `Re: ${m.subject}`, text: `Hi,\n\nThank you, that's everything we need. We're researching ${s.buyer_new_address.split(',').slice(0, 2).join(',')} now and will email you a proof within 2 working days (reference ${order.id}). Once you approve it, the framed print will be delivered to your branch.\n\nBest wishes,\nReece\nHouse Almanac` });
+    await env.DB.prepare(`UPDATE prospects SET status = ?, samples_used = samples_used + ?, last_contact = ?, followup_due = NULL WHERE email = ?`)
+      .bind(free ? 'sample_in_progress' : 'proof_in_progress', free ? 1 : 0, now(), prospect.email).run();
+    const street = s.buyer_new_address.split(',').slice(0, 2).join(',');
+    await sendMail(env, {
+      to: m.from, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, fromName: 'Reece Egan-Sheath | House Almanac',
+      text: free
+        ? `Hi,\n\nThank you, that's everything we need. We're researching ${street} now and will email you a proof within 2 working days (reference ${order.id}). Once you approve it, the framed print will be delivered to your branch, free of charge.\n\nBest wishes,\nReece\nHouse Almanac`
+        : `Hi,\n\nThank you. We're researching ${street} now and will email you a free proof within 2 working days (reference ${order.id}). If you'd like it printed and framed for your buyer, it's £75 delivered to your branch, and you can approve and pay in one step when the proof arrives.\n\nBest wishes,\nReece\nHouse Almanac`,
+    });
+    if (!free) await overCapAlert(env, prospect.agency);
     return;
   }
-  await env.DB.prepare(`UPDATE prospects SET status = ?, last_contact = ? WHERE email = ?`).bind(c.intent === 'interested' || c.intent === 'sample_with_details' ? 'interested' : 'replied', now(), prospect.email).run();
+  await env.DB.prepare(`UPDATE prospects SET status = ?, last_contact = ?, followup_due = NULL WHERE email = ?`).bind(c.intent === 'interested' || c.intent === 'sample_with_details' ? 'interested' : 'replied', now(), prospect.email).run();
   if (c.reply) await sendMail(env, { to: m.from, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, text: c.reply, fromName: 'Reece Egan-Sheath | House Almanac' });
+}
+
+// Keep the agency's logo (the largest image they sent) for their prints.
+async function saveAgentLogo(env, domain, images, replace = false) {
+  if (!domain || !images?.length) return false;
+  const size = (a) => a.content?.byteLength || a.content?.length || 0;
+  const best = images.filter(a => size(a) > 2000 && size(a) < 3e6).sort((a, b) => size(b) - size(a))[0];
+  if (!best) return false;
+  if (!replace && await env.FILES.get('logo-' + domain, 'stream').then(r => { if (r) r.cancel(); return !!r; })) return false;
+  const bytes = best.content instanceof ArrayBuffer ? new Uint8Array(best.content) : best.content;
+  await env.FILES.put('logo-' + domain, bytes, { metadata: { type: best.mimeType || 'image/png' } });
+  await logEvent(env, null, 'agent_logo_saved', { domain, type: best.mimeType, bytes: bytes.length });
+  return true;
+}
+
+const REVIEW_RE = /https?:\/\/[^\s<>"')]*(g\.page|google\.[a-z.]+\/maps|search\.google\.com\/local|maps\.app\.goo\.gl|g\.co\/kgs|trustpilot\.com|allagents\.co\.uk|reviews\.co\.uk|feefo)[^\s<>"')]*/i;
+
+// Tell Reece when agencies keep asking for free framed samples after they've run out.
+async function overCapAlert(env, agency) {
+  const n = Number(await kvGet(env, 'over_cap_requests') || 0) + 1;
+  await kvSet(env, 'over_cap_requests', String(n));
+  if (n % 3 !== 0) return;
+  await sendMail(env, {
+    to: BRAND.from, bcc: false, subject: `Decision: ${n} agencies wanted samples after the free ones ran out`,
+    text: `The latest was ${agency}. Since the free framed samples ran out, ${n} agencies have asked for one; each got a free digital proof and the option to buy the framed print at £75.\n\nEach extra free framed sample costs £51.30. If you'd like to fund more, tell Claude how many (e.g. "approve 5 more samples").`,
+  });
+}
+
+// A bounced outreach email: stop emailing that address.
+async function handleBounce(env, text, subject) {
+  const { results } = await env.DB.prepare(`SELECT email FROM prospects WHERE status IN ('emailed','followed_up') AND last_contact >= ?`).bind(new Date(Date.now() - 10 * 86400e3).toISOString()).all();
+  const hit = results.filter(r => text.includes(r.email));
+  for (const r of hit) await env.DB.prepare(`UPDATE prospects SET status = 'bounced', followup_due = NULL WHERE email = ?`).bind(r.email).run();
+  await logEvent(env, null, 'bounce', { subject, prospects: hit.map(r => r.email) });
 }
 
 async function handleGeneral(env, m) {

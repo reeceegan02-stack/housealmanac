@@ -9,13 +9,20 @@
   "browser": { "binding": "BROWSER" },
   "d1_databases": [{ "binding": "DB", "database_name": "housealmanac-ops", "database_id": "4c5bdc59-6ee4-4a9d-a4ee-968c5a76ace5" }],
   "kv_namespaces": [{ "binding": "FILES", "id": "b3de108bd54341ee843a5c93abe8c8a9" }],
-  "workflows": [{ "name": "housealmanac-order", "binding": "ORDER_FLOW", "class_name": "OrderWorkflow" }],
+  "workflows": [
+    { "name": "housealmanac-order", "binding": "ORDER_FLOW", "class_name": "OrderWorkflow" },
+    { "name": "housealmanac-outreach", "binding": "OUTREACH_FLOW", "class_name": "OutreachWorkflow" }
+  ],
   "triggers": { "crons": ["*/30 * * * *"] },
   // In Workers Builds, copy API keys from build secrets into runtime secrets (no-op locally).
   "build": { "command": "node scripts/sync-secrets.mjs" },
   "vars": {
     "PUBLIC_BASE": "https://housealmanac-ops.reeceegan02.workers.dev",
     "FORWARD_TO": "reeceegan02@gmail.com",
-    "FREE_SAMPLES_CAP": "5"
+    "FREE_SAMPLES_CAP": "5",
+    "OUTREACH_WARMUP_PER_DAY": "10",
+    "OUTREACH_PER_DAY": "20",
+    "OUTREACH_PAUSED": "false",
+    "AGENT_LINK": "https://buy.stripe.com/00w14pgrf75m1p62GD2wU02"
   }
 }

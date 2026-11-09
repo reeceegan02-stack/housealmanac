@@ -50,8 +50,18 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **Inbox**: hello@ → Email Routing → worker `email()` → copy forwarded to reeceegan02@gmail.com → Claude classifies:
   approve → Prodigi API order; changes → revised proof; cancel before approval → Stripe refund; damaged with photo → free replacement;
   agent replies → answered, free-sample orders created (cap 5), "no thanks" → opted out; general enquiries → answered.
+- **Agent growth engine** (`ops/src/outreach.js`, Workflow `housealmanac-outreach`): weekdays 10:00 UTC the cron starts the day's run:
+  Claude web search finds estate agents area by area (AREAS list: Greater Manchester first, then North West, Yorkshire, UK) → only Ltd/LLP,
+  published email that is verified on their own website (PECR) → emails OUTREACH_WARMUP_PER_DAY (10) for the first week, then OUTREACH_PER_DAY (20)
+  → follow-up after 7 days → replies handled by the inbox. Bounces mark prospects 'bounced'. Pause: set var OUTREACH_PAUSED=true.
+  Reece wants volume ("the faster you get out there the better"); ramp gradually to protect hello@ deliverability (proofs use the same domain).
+- **Free framed samples** (Reece, 9 Nov): 5, plus 1 more per agency that becomes a paying customer (`samplesStatus`). When none are left, agents get
+  a free digital proof (source agent-proof); on approval they get the £75 agent link with ?client_reference_id=HA-…, and payment prints it.
+  After every 3 over-cap sample requests hello@ gets a "Decision" email; Reece may approve more (raise FREE_SAMPLES_CAP).
+- Agent prints carry the agency logo (largest image they email, FILES logo-<domain>) and a QR code to their reviews link (kv review-<domain>).
+- Agent Stripe link (£75): https://buy.stripe.com/00w14pgrf75m1p62GD2wU02
 - **Cron every 30 min**: Prodigi tracking → "on its way" email; retry stuck orders (3 tries then alert); Stripe reconciliation (paid sessions
-  with no order get created, and hello@ is warned the webhook missed them); 9am agent follow-ups; Monday weekly summary to hello@.
+  with no order get created, and hello@ is warned the webhook missed them); Monday weekly summary to hello@.
 - **Admin API** (header `x-admin-key` = Worker secret ADMIN_KEY; not stored anywhere — rotate it in Worker settings if you need access):
   GET /admin/orders · GET /admin/order/:id · POST /admin/order/:id/restart · POST /admin/order/:id/approve · POST /admin/test-order
   · GET|POST /admin/prospects · GET /admin/events · POST /admin/send · POST /admin/summary · POST /admin/order/:id/set (fields) · POST /admin/stripe/reconcile · POST /admin/etsy/poll

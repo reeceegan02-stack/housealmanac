@@ -1,7 +1,7 @@
 // Durable order pipeline: locate -> research -> render -> check -> email proof.
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { NonRetryableError } from 'cloudflare:workflows';
-import { ensureSchema, getOrder, updateOrder, logEvent, randomKey, bytesToBase64, extractJson, BRAND } from './util.js';
+import { ensureSchema, getOrder, updateOrder, logEvent, randomKey, bytesToBase64, extractJson, BRAND, kvGet } from './util.js';
 import { geocode, streetGeometry, pickNlsLayer, streetSales } from './geo.js';
 import { researchStreet, reviseContent } from './research.js';
 import { composeHtml } from './compose.js';
@@ -21,7 +21,7 @@ export class OrderWorkflow extends WorkflowEntrypoint {
       await ensureSchema(env);
       const o = await getOrder(env, orderId);
       if (!o) throw new NonRetryableError('Order not found ' + orderId);
-      await updateOrder(env, orderId, { status: mode === 'revise' ? 'revising' : 'researching' });
+      await updateOrder(env, orderId, { status: mode === 'new' ? 'researching' : 'revising' });
       return o;
     });
     const rev = order.revision || 0;
@@ -34,7 +34,10 @@ export class OrderWorkflow extends WorkflowEntrypoint {
     });
 
     let data;
-    if (mode === 'revise' && order.data_json) {
+    if (mode === 'rerender' && order.data_json) {
+      // Same content, new artwork (e.g. the agent's logo or review QR code was added).
+      data = JSON.parse(order.data_json);
+    } else if (mode === 'revise' && order.data_json) {
       data = await step.do(`revise v${rev}`, { ...R(2, '1 minute'), timeout: '15 minutes' }, () =>
         reviseContent(env, JSON.parse(order.data_json), order.change_notes || '', { address: order.address, message: order.message }));
     } else if (order.data_json) {
@@ -48,10 +51,12 @@ export class OrderWorkflow extends WorkflowEntrypoint {
       });
     }
     const message = (mode === 'revise' && typeof data.message === 'string') ? data.message : order.message;
+    if (mode === 'rerender') await step.do('mark rerender', () => updateOrder(env, order.id, { status: 'revising' }));
 
     const rendered = await step.do(`render v${rev}`, { ...R(2, '1 minute'), timeout: '10 minutes' }, async () => {
       const today = await todayTiles(geo, lines);
-      const html = composeHtml({ data, geo, lines, histLayer: nls.layer, todayTiles: today, sales, style: order.style, message });
+      const agent = await agentInfo(env, order);
+      const html = composeHtml({ data, geo, lines, histLayer: nls.layer, todayTiles: today, sales, style: order.style, message, agent });
       const r = await renderPrint(env, html);
       const fileKey = `print-${order.id}-v${rev}-${randomKey(10)}.jpg`;
       const proofKey = `proof-${order.id}-v${rev}-${randomKey(10)}.jpg`;
@@ -93,7 +98,7 @@ export class OrderWorkflow extends WorkflowEntrypoint {
     await step.do(`email proof v${rev}`, async () => {
       const proof = new Uint8Array(await env.FILES.get(rendered.proofKey, 'arrayBuffer'));
       const t = proofEmail(order, data, rev);
-      const to = order.source === 'agent-sample' ? (JSON.parse(order.ship_json || '{}').agent_email || order.email) : order.email;
+      const to = order.source.startsWith('agent-') ? (JSON.parse(order.ship_json || '{}').agent_email || order.email) : order.email;
       await sendMail(env, { to, subject: t.subject, text: t.text, orderId: order.id, attachments: [jpegAttachment(proof, `House-Almanac-proof-${order.id}.jpg`)] });
       await updateOrder(env, order.id, {
         status: 'proof_sent', data_json: JSON.stringify(data), message,
@@ -132,4 +137,21 @@ Reply with JSON only: {"ok": true|false, "blocking_issues": ["..."], "minor_issu
   }
   blocking.push(...(review.blocking_issues || []));
   return { ok: blocking.length === 0, blocking, minor: review.minor_issues || [] };
+}
+
+// Branding for estate-agent orders: their logo (if they've sent one) and a QR code to their reviews.
+async function agentInfo(env, order) {
+  const ship = JSON.parse(order.ship_json || '{}');
+  let domain = ship.agent_domain || (order.source.startsWith('agent-') ? String(ship.agent_email || order.email || '').split('@')[1] : null);
+  if (!domain && order.email) {
+    const d = order.email.toLowerCase().split('@')[1];
+    if (d && await env.DB.prepare('SELECT 1 FROM prospects WHERE domain = ?').bind(d).first()) domain = d;
+  }
+  if (!domain) return null;
+  domain = domain.toLowerCase();
+  const p = await env.DB.prepare('SELECT agency FROM prospects WHERE domain = ? LIMIT 1').bind(domain).first();
+  const logo = await env.FILES.get('logo-' + domain, 'stream');
+  if (logo) await logo.cancel();
+  const reviewUrl = ship.review_url || await kvGet(env, 'review-' + domain);
+  return { name: p?.agency || order.name, logoUrl: logo ? `${env.PUBLIC_BASE}/f/logo-${domain}` : null, reviewUrl: reviewUrl || null };
 }

@@ -57,7 +57,11 @@ Please check:
 - the house number and street
 - anything in the story or timeline you know to be different
 
-If it's right, just reply "approved" and we'll print and dispatch it. If you'd like changes, reply and tell us what to change.
+${order.source === 'agent-proof'
+  ? `If it's right and you'd like it printed and framed for your buyer (£75, delivered to your branch), just reply "approved" and we'll send you the payment link. If you'd like changes, reply and tell us what to change.`
+  : `If it's right, just reply "approved" and we'll print and dispatch it${order.source === 'agent-sample' ? ' to your branch' : ''}. If you'd like changes, reply and tell us what to change.`}${order.source && order.source.startsWith('agent-') ? `
+
+Tip: reply with your logo attached and a link to your Google reviews page, and we'll add them to the print with a QR code.` : ''}
 
 ${sig}`,
   };
