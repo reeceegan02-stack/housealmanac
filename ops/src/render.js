@@ -24,7 +24,8 @@ export async function todayTiles(geo, lines) {
 }
 
 export async function renderPrint(env, html) {
-  const browser = await puppeteer.launch(env.BROWSER);
+  // keep_alive: the default 60s idle limit closes the browser while ~100 map tiles load.
+  const browser = await puppeteer.launch(env.BROWSER, { keep_alive: 600000 });
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: W, height: H, deviceScaleFactor: 3508 / W });

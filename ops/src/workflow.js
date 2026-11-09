@@ -37,9 +37,15 @@ export class OrderWorkflow extends WorkflowEntrypoint {
     if (mode === 'revise' && order.data_json) {
       data = await step.do(`revise v${rev}`, { ...R(2, '1 minute'), timeout: '15 minutes' }, () =>
         reviseContent(env, JSON.parse(order.data_json), order.change_notes || '', { address: order.address, message: order.message }));
+    } else if (order.data_json) {
+      // A previous attempt already researched this order (e.g. it failed later, at rendering): reuse it.
+      data = JSON.parse(order.data_json);
     } else {
-      data = await step.do('research', { ...R(2, '1 minute'), timeout: '20 minutes' }, () =>
-        researchStreet(env, { ...geo, address: order.address, moveIn: order.move_in, message: order.message, sales }));
+      data = await step.do('research', { ...R(2, '1 minute'), timeout: '20 minutes' }, async () => {
+        const d = await researchStreet(env, { ...geo, address: order.address, moveIn: order.move_in, message: order.message, sales });
+        await updateOrder(env, order.id, { data_json: JSON.stringify(d) });
+        return d;
+      });
     }
     const message = (mode === 'revise' && typeof data.message === 'string') ? data.message : order.message;
 

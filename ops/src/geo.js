@@ -86,17 +86,23 @@ export async function geocode(rawAddress) {
 export async function streetGeometry(lat, lon, street, town) {
   if (!street) return [];
   const name = street.replace(/["\\]/g, '');
-  const q = `[out:json][timeout:25];way(around:400,${lat},${lon})["highway"]["name"="${name}"];out geom;`;
-  for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+  // Nominatim first: fast and reliable from Cloudflare. Overpass (all segments) as a fallback.
+  const nom = await nominatimStreet(lat, lon, name, town);
+  if (nom.length) return nom;
+  const q = `[out:json][timeout:20];way(around:400,${lat},${lon})["highway"]["name"="${name}"];out geom;`;
+  for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter']) {
     try {
-      const r = await fetch(host, { method: 'POST', headers: { 'user-agent': UA, 'content-type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q), ...T(30000) });
+      const r = await fetch(host, { method: 'POST', headers: { 'user-agent': UA, 'content-type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q), ...T(25000) });
       if (!r.ok) continue;
       const d = await r.json();
       const lines = (d.elements || []).filter(e => e.geometry).map(e => e.geometry.map(g => [g.lat, g.lon]));
       if (lines.length) return lines;
     } catch (e) { /* try next */ }
   }
-  // Fallback: Nominatim returns the street's line geometry too.
+  return [];
+}
+
+async function nominatimStreet(lat, lon, name, town) {
   try {
     const u = new URL('https://nominatim.openstreetmap.org/search');
     u.search = new URLSearchParams({ format: 'jsonv2', countrycodes: 'gb', limit: '10', polygon_geojson: '1', street: name, ...(town ? { city: town } : {}) }).toString();
