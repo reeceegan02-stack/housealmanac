@@ -40,7 +40,8 @@ export async function renderPrint(env, html) {
     const fit = await page.evaluate(() => window.__fit());
     const images = await page.evaluate(() => {
       const imgs = [...document.images];
-      return { total: imgs.length, broken: imgs.filter(i => !i.complete || i.naturalWidth === 0).length };
+      // a 25-inch tile hidden after all fallbacks failed is covered by the six-inch layer underneath, so it isn't 'broken'
+      return { total: imgs.length, broken: imgs.filter(i => !i.complete || (i.naturalWidth === 0 && i.style.visibility !== 'hidden')).length };
     });
     const full = await page.screenshot({ type: 'jpeg', quality: 92, clip: { x: 0, y: 0, width: W, height: H - 0.4 } });
     await page.setViewport({ width: W, height: H, deviceScaleFactor: 1 });

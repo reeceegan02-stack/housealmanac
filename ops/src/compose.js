@@ -212,10 +212,15 @@ export function composeHtml({ data, geo, lines, histLayer, histAlts = [], todayT
   const hero = frameMap({ lat: geo.lat, lon: geo.lon, lines, boxW: heroBox.w, boxH: heroBox.h, devicePx: dev, maxZoom: 18, minSpan: 820 });
   const today = todayTiles.frame;
 
-  const heroTiles = histLayer
+  // Backing layer: OS six-inch 2nd edition (1890s-1910s, full GB coverage) under the 25-inch map, so any
+  // patch the 25-inch scans don't cover shows the same-era map instead of blank paper.
+  const bgZ = Math.min(hero.z, 17);
+  const heroBg = tileLayer({ ...hero, z: bgZ, scale: hero.scale * 2 ** (hero.z - bgZ), boxW: heroBox.w, boxH: heroBox.h,
+    urlFor: (z, x, y) => `https://mapseries-tilesets.s3.amazonaws.com/os/6inchsecond/${z}/${x}/${y}.png`, filter: theme.histFilter });
+  const heroTiles = heroBg + (histLayer
     ? tileLayer({ ...hero, boxW: heroBox.w, boxH: heroBox.h, urlFor: (z, x, y) => nlsTileUrl(histLayer, z, x, y), filter: theme.histFilter,
         altUrls: (z, x, y) => histTileAlts(histAlts, histLayer, z, x, y) })
-    : '';
+    : '');
   const todayLayer = tileLayer({ ...today, boxW: todayBox.w, boxH: todayBox.h, urlFor: (z, x, y) => todayTiles.src[`${z}/${x}/${y}`] || '', filter: theme.todayFilter });
 
   const heroHl = lines && lines.length
