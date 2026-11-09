@@ -5,7 +5,7 @@ export async function createOrder(env, o) {
   await ensureSchema(env);
   if (o.external_ref) {
     const existing = await env.DB.prepare('SELECT * FROM orders WHERE external_ref = ?').bind(o.external_ref).first();
-    if (existing) return existing;
+    if (existing) return { ...existing, isNew: false };
   }
   const id = newId();
   const t = now();
@@ -16,7 +16,7 @@ export async function createOrder(env, o) {
     .run();
   await logEvent(env, id, 'order_created', { source: o.source, product: o.product, amount: o.amount_pence });
   await startOrderWorkflow(env, id, 'new', 0);
-  return { id, ...o, status: 'new' };
+  return { id, ...o, status: 'new', isNew: true };
 }
 
 export async function startOrderWorkflow(env, orderId, mode = 'new', revision = 0, attempt = 0) {

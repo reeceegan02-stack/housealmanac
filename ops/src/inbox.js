@@ -86,7 +86,6 @@ Classify the email and draft a reply. JSON only:
   }
   if (c.intent === 'changes' && ['proof_sent', 'needs_attention', 'revising'].includes(order.status)) {
     const rev = (order.revision || 0) + 1;
-    const notes = [order.change_notes, c.change_request].filter(Boolean).join('\n---\n');
     await updateOrder(env, order.id, { revision: rev, change_notes: c.change_request, status: 'revising' });
     await startOrderWorkflow(env, order.id, 'revise', rev);
     await sendMail(env, { to: m.from, orderId: order.id, subject: `Re: ${m.subject}`, text: `Hi ${firstName(order.name)},\n\nThanks, we're making those changes now and will send you an updated proof shortly.\n\nBest wishes,\nReece\nHouse Almanac` });

@@ -45,19 +45,25 @@ Christmas: last order date 9 December.
   Replies arrive at hello@ → reeceegan02@gmail.com; read them in Chrome Gmail (search `to:hello@housealmanac.co.uk`). Only read House Almanac mail there.
 - Etsy shop: HouseAlmanac (Reece's Etsy account, signed in in Chrome). Listing copy in `marketing/etsy_listing.md`.
 
-## Order runbook
-1. **Check for orders**: Stripe → Transactions. For each new paid order, note the order date, customer email, product, address, move-in year and message.
-2. **Research the street** (aim: same day):
-   - Locate the address (OpenStreetMap search; take lat/lon). Get the street's OSM way geometry for the highlight.
-   - Historic map: NLS 25-inch OS tiles (`25_inch/<county>` layers, or `25_inch_holes_england`), max zoom 18; capture a mosaic around the street. Credit NLS (CC-BY).
-   - Today's map: OpenStreetMap tiles (credit © OpenStreetMap contributors).
-   - History: council/heritage pages, Historic England, British History Online, local history society pages, Wikipedia. Every fact on the print must have a source; keep the list in the order folder.
-   - Sales: HM Land Registry price paid data for the street (exclude the customer's own house).
-3. **Build the print**: copy `pipeline/examples/bentgate/` to `orders/<order-id>/`, edit the template text (title, subtitle, story, timeline, sales strip, message), run the build, then render at 300 dpi with `render300.py` (3508×4961 JPG). Pick the theme the customer asked for (heritage default; `pipeline/themes.py`).
-4. **Check**: view the full render and zoomed crops; check spelling of names and the message character for character; check every fact against its source.
-5. **Proof**: email the customer a low-res JPG proof (needs Reece's approval or standing approval) and ask them to reply "approved" or list changes. Promise: proof within 2 working days of the order.
-6. **Print**: once approved, create the Prodigi order (country UK → SKU → upload image → customer's delivery address from Stripe → Standard shipping), reference = HA-<Stripe payment id>. Confirm the cost with Reece if he hasn't given standing approval for order fulfilment.
-7. **Log**: add revenue and Prodigi cost to `business/ledger.csv`. Delete print files 90 days after delivery (privacy policy).
+## Automation (runs 24/7 in Cloudflare, no laptop needed)
+Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `main` via Workers Builds, root `/ops`).
+- **Stripe order** → webhook `/stripe/webhook` → D1 `orders` row → Workflow `housealmanac-order`:
+  geocode (postcodes.io + Nominatim) → street outline (Overpass) → NLS 25-inch layer probe → Land Registry sales (SPARQL, own house excluded)
+  → Claude API research with web search (`ops/src/research.js`) → HTML print (`ops/src/compose.js`) → Browser Rendering 300 dpi JPG + proof
+  → Claude vision check → proof emailed from hello@. Failures email "ACTION NEEDED" to hello@ (copied to Reece's Gmail).
+- **Inbox**: hello@ → Email Routing → worker `email()` → copy forwarded to reeceegan02@gmail.com → Claude classifies:
+  approve → Prodigi API order; changes → revised proof; cancel before approval → Stripe refund; damaged with photo → free replacement;
+  agent replies → answered, free-sample orders created (cap 5), "no thanks" → opted out; general enquiries → answered.
+- **Cron every 30 min**: Prodigi tracking → "on its way" email; retry stuck orders (3 tries then alert); 9am agent follow-ups; Monday weekly summary to hello@.
+- **Admin API** (header `x-admin-key` = Worker secret ADMIN_KEY; not stored anywhere — rotate it in Worker settings if you need access):
+  GET /admin/orders · GET /admin/order/:id · POST /admin/order/:id/restart · POST /admin/order/:id/approve · POST /admin/test-order
+  · GET|POST /admin/prospects · GET /admin/events · POST /admin/send · POST /admin/summary
+- Secrets Reece adds once: ANTHROPIC_API_KEY, PRODIGI_API_KEY, STRIPE_SECRET_KEY (restricted), STRIPE_WEBHOOK_SECRET.
+- Not automated yet: Etsy orders (need Etsy API app) — check Etsy Orders in Chrome until then.
+
+## Manual fallback runbook (only if the automation is down)
+1. Stripe → Transactions for new paid orders. 2. Research the street (sources for every fact). 3. Build the print with `pipeline/` (render300.py, 3508x4961).
+4. Check it. 5. Email the proof from hello@. 6. On approval, order from Prodigi (GB, GLOBAL-CFP-A3 or GLOBAL-FAP-A3, Standard). 7. Log in `business/ledger.csv`.
 
 ## Repo layout
-- `site/` website · `pipeline/` print templates and render scripts · `marketing/` mockups, Etsy listing, ad copy · `business/` pricing model, ledger, prospects.
+- `ops/` cloud operations worker · `site/` website · `pipeline/` print templates and render scripts · `marketing/` mockups, Etsy listing, ad copy · `business/` pricing model, ledger, prospects.

@@ -65,7 +65,7 @@ async function stripeWebhook(req, env, ctx) {
     const fields = sessionToOrder(s);
     const order = await createOrder(env, { source: 'stripe', ...fields });
     const t = orderReceivedEmail({ ...fields, id: order.id });
-    if (fields.email) ctx.waitUntil(sendMail(env, { to: fields.email, subject: t.subject, text: t.text, orderId: order.id }));
+    if (fields.email && order.isNew) ctx.waitUntil(sendMail(env, { to: fields.email, subject: t.subject, text: t.text, orderId: order.id }));
     return json({ received: true, order: order.id });
   }
   return json({ received: true, ignored: evt.type });
