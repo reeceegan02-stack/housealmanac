@@ -15,7 +15,7 @@ export async function todayTiles(geo, lines) {
   let failed = 0;
   await Promise.all(need.map(async ([z, x, y]) => {
     try {
-      const r = await fetch(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`, { headers: { 'user-agent': UA, referer: 'https://housealmanac.co.uk/' } });
+      const r = await fetch(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`, { headers: { 'user-agent': UA, referer: 'https://housealmanac.co.uk/' }, signal: AbortSignal.timeout(20000) });
       if (!r.ok) { failed++; return; }
       src[`${z}/${x}/${y}`] = 'data:image/png;base64,' + bytesToBase64(new Uint8Array(await r.arrayBuffer()));
     } catch (e) { failed++; }

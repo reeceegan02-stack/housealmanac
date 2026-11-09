@@ -1,6 +1,8 @@
 // Address lookup, street geometry, historic map layer choice and Land Registry sales.
 
 const UA = 'HouseAlmanac/1.0 (+https://housealmanac.co.uk; hello@housealmanac.co.uk)';
+// Every outside lookup gets a time limit so one slow service can't stall an order.
+const T = (ms) => ({ signal: AbortSignal.timeout(ms) });
 
 const POSTCODE_RE = /\b([A-Z]{1,2}\d[A-Z\d]?)\s*(\d[A-Z]{2})\b/i;
 
@@ -34,7 +36,7 @@ export function parseAddress(raw) {
 
 export async function postcodeInfo(postcode) {
   if (!postcode) return null;
-  const r = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`, { headers: { 'user-agent': UA } });
+  const r = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`, { headers: { 'user-agent': UA }, ...T(15000) });
   if (!r.ok) return null;
   const d = (await r.json()).result;
   return d && {
@@ -46,7 +48,7 @@ export async function postcodeInfo(postcode) {
 
 export async function nominatim(query) {
   const u = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=gb&limit=1&q=${encodeURIComponent(query)}`;
-  const r = await fetch(u, { headers: { 'user-agent': UA, 'accept-language': 'en-GB' } });
+  const r = await fetch(u, { headers: { 'user-agent': UA, 'accept-language': 'en-GB' }, ...T(15000) });
   if (!r.ok) return null;
   const d = await r.json();
   if (!d.length) return null;
@@ -81,20 +83,36 @@ export async function geocode(rawAddress) {
 }
 
 // Street centreline from OpenStreetMap. Returns array of polylines [[lat,lon],...].
-export async function streetGeometry(lat, lon, street) {
+export async function streetGeometry(lat, lon, street, town) {
   if (!street) return [];
   const name = street.replace(/["\\]/g, '');
   const q = `[out:json][timeout:25];way(around:400,${lat},${lon})["highway"]["name"="${name}"];out geom;`;
-  for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+  for (const host of ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
     try {
-      const r = await fetch(host, { method: 'POST', headers: { 'user-agent': UA, 'content-type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q) });
+      const r = await fetch(host, { method: 'POST', headers: { 'user-agent': UA, 'content-type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q), ...T(30000) });
       if (!r.ok) continue;
       const d = await r.json();
       const lines = (d.elements || []).filter(e => e.geometry).map(e => e.geometry.map(g => [g.lat, g.lon]));
-      return lines;
+      if (lines.length) return lines;
     } catch (e) { /* try next */ }
   }
-  return [];
+  // Fallback: Nominatim returns the street's line geometry too.
+  try {
+    const u = new URL('https://nominatim.openstreetmap.org/search');
+    u.search = new URLSearchParams({ format: 'jsonv2', countrycodes: 'gb', limit: '10', polygon_geojson: '1', street: name, ...(town ? { city: town } : {}) }).toString();
+    const r = await fetch(u, { headers: { 'user-agent': UA, 'accept-language': 'en-GB' }, ...T(15000) });
+    if (!r.ok) return [];
+    const d = await r.json();
+    const lines = [];
+    for (const e of d) {
+      if (e.category !== 'highway' || !e.geojson) continue;
+      if (haversine([lat, lon], [+e.lat, +e.lon]) > 800) continue;
+      const g = e.geojson;
+      const parts = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
+      for (const part of parts) lines.push(part.map(([x, y]) => [y, x]));
+    }
+    return lines;
+  } catch (e) { return []; }
 }
 
 // ---------- Web Mercator ----------
@@ -157,7 +175,7 @@ export async function pickNlsLayer(geo) {
     let total = 0, ok = 0;
     for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]]) {
       try {
-        const r = await fetch(nlsTileUrl(layer, z, tx + dx, ty + dy));
+        const r = await fetch(nlsTileUrl(layer, z, tx + dx, ty + dy), T(15000));
         if (!r.ok) continue;
         const size = (await r.arrayBuffer()).byteLength;
         total += size; if (size > 6000) ok++;
@@ -188,7 +206,7 @@ SELECT ?paon ?saon ?amount ?date ?pc WHERE {
   const r = await fetch('https://landregistry.data.gov.uk/landregistry/query', {
     method: 'POST',
     headers: { 'user-agent': UA, accept: 'application/sparql-results+json', 'content-type': 'application/x-www-form-urlencoded' },
-    body: 'query=' + encodeURIComponent(query),
+    body: 'query=' + encodeURIComponent(query), ...T(45000),
   });
   if (!r.ok) throw new Error('Land Registry query failed ' + r.status);
   const d = await r.json();

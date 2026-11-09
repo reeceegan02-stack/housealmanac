@@ -27,7 +27,7 @@ export class OrderWorkflow extends WorkflowEntrypoint {
     const rev = order.revision || 0;
 
     const geo = await step.do('geocode', R(4), () => geocode(order.address));
-    const lines = await step.do('street geometry', R(3), () => streetGeometry(geo.lat, geo.lon, geo.street));
+    const lines = await step.do('street geometry', R(3), () => streetGeometry(geo.lat, geo.lon, geo.street, geo.town));
     const nls = await step.do('historic map layer', R(2), () => pickNlsLayer(geo));
     const sales = await step.do('land registry sales', R(2), async () => {
       try { return await streetSales(geo); } catch (e) { return []; }

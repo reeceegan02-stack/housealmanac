@@ -56,7 +56,10 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **Admin API** (header `x-admin-key` = Worker secret ADMIN_KEY; not stored anywhere — rotate it in Worker settings if you need access):
   GET /admin/orders · GET /admin/order/:id · POST /admin/order/:id/restart · POST /admin/order/:id/approve · POST /admin/test-order
   · GET|POST /admin/prospects · GET /admin/events · POST /admin/send · POST /admin/summary
-- Secrets Reece adds once: ANTHROPIC_API_KEY, PRODIGI_API_KEY, STRIPE_SECRET_KEY (restricted), STRIPE_WEBHOOK_SECRET.
+- Secrets (ANTHROPIC_API_KEY, PRODIGI_API_KEY, STRIPE_SECRET_KEY (restricted), STRIPE_WEBHOOK_SECRET, later ETSY_KEYSTRING/ETSY_SHARED_SECRET)
+  live as **Build** secrets on housealmanac-ops (Settings → Build → Variables and secrets). Each Workers Build copies them into runtime
+  secrets (`ops/scripts/sync-secrets.mjs`, run by wrangler's custom build). To rotate: change the build secret, then retry the build.
+  `/health` shows true/false for each key (never the values).
 - **Etsy**: once Reece registers an Etsy app (ETSY_KEYSTRING + ETSY_SHARED_SECRET secrets) and opens /etsy/connect once,
   the cron pulls paid receipts → workflow → after the AI check it prints straight away (Etsy API can't message buyers, so no proof)
   → tracking posted back to Etsy. Until connected, check Etsy Orders in Chrome.
