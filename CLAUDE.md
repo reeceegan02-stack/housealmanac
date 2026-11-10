@@ -99,7 +99,7 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
   live as **Build** secrets on housealmanac-ops (Settings → Build → Variables and secrets). Each Workers Build copies them into runtime
   secrets (`ops/scripts/sync-secrets.mjs`, run by wrangler's custom build). To rotate: change the build secret, then retry the build.
   `/health` shows true/false for each key (never the values).
-- **Etsy**: app "house-almanac-orders" approved 10 Nov 2026; callback URL added 10 Nov. Last step: Reece clicks Allow at /etsy/connect. The cron pings the API every 30 min; when the key goes
+- **Etsy**: CONNECTED 10 Nov 2026 (app "house-almanac-orders" approved, callback added, access allowed; /admin/check shows etsy.connected). Forwarding sale emails is no longer needed. The cron pings the API every 30 min; when the key goes
   live it emails hello@ the last two steps (add callback URL https://housealmanac-ops.reeceegan02.workers.dev/etsy/callback in the app, then
   Reece opens /etsy/connect and clicks Allow). Reece must paste ETSY_KEYSTRING + ETSY_SHARED_SECRET as Build secrets (never enter keys yourself).
   Once connected: cron pulls paid receipts → workflow → prints straight after the AI check (no proof; Etsy API can't message buyers) → tracking to Etsy.
