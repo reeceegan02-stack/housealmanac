@@ -43,7 +43,9 @@ Gift vouchers (9 Nov): framed £89 https://buy.stripe.com/28EcN74IxdtKebS2GD2wU0
 - Domain/DNS/email routing: Cloudflare account reeceegan02@gmail.com.
 - Old worker `housealmanac-site` is retired (no domains); can be deleted.
 - **Sending email**: the ops worker sends from hello@ (Cloudflare Email Service, Workers Paid $5/mo). For a one-off email, POST /admin/send
-  on housealmanac-ops (fields: to, subject, text, html, cc, bcc, attachments, fromName; BCC to hello@ by default). The old `housealmanac-mail`
+  on housealmanac-ops (fields: to, subject, text, html, cc, bcc, attachments, fromName; BCC to hello@ by default).
+  Attachments must reach the Email Service as bytes (Uint8Array): base64 strings were sent as text, so attachments up to 10 Nov 10:30 UTC
+  didn't open. sendMail converts strings; prints are also shown in the email body (inlineImage) with a view-online link. The old `housealmanac-mail`
   worker is no longer used.
   Replies arrive at hello@ → ops worker (acts on them) → copy in reeceegan02@gmail.com; read in Chrome Gmail (`to:hello@housealmanac.co.uk`) only if needed.
 - Etsy shop: HouseAlmanac (Reece's Etsy account, signed in in Chrome). Listing copy in `marketing/etsy_listing.md`.
@@ -97,7 +99,7 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
   live as **Build** secrets on housealmanac-ops (Settings → Build → Variables and secrets). Each Workers Build copies them into runtime
   secrets (`ops/scripts/sync-secrets.mjs`, run by wrangler's custom build). To rotate: change the build secret, then retry the build.
   `/health` shows true/false for each key (never the values).
-- **Etsy**: app "house-almanac-orders" registered 9 Nov 2026 (Pending Personal Approval). The cron pings the API every 30 min; when the key goes
+- **Etsy**: app "house-almanac-orders" approved 10 Nov 2026; callback URL added 10 Nov. Last step: Reece clicks Allow at /etsy/connect. The cron pings the API every 30 min; when the key goes
   live it emails hello@ the last two steps (add callback URL https://housealmanac-ops.reeceegan02.workers.dev/etsy/callback in the app, then
   Reece opens /etsy/connect and clicks Allow). Reece must paste ETSY_KEYSTRING + ETSY_SHARED_SECRET as Build secrets (never enter keys yourself).
   Once connected: cron pulls paid receipts → workflow → prints straight after the AI check (no proof; Etsy API can't message buyers) → tracking to Etsy.
