@@ -109,7 +109,7 @@ export class OrderWorkflow extends WorkflowEntrypoint {
       await step.do('email office preview', async () => {
         const proof = new Uint8Array(await env.FILES.get(rendered.proofKey, 'arrayBuffer'));
         await updateOrder(env, order.id, { status: 'proof_sent', data_json: JSON.stringify(data), message, file_key: rendered.fileKey, proof_key: rendered.proofKey });
-        await sendPreviewEmail(env, order, geo.street || data.title, proof);
+        await sendPreviewEmail(env, { ...order, proof_key: rendered.proofKey }, geo.street || data.title, proof);
       });
       return { status: 'preview_sent', qa };
     }
@@ -118,7 +118,8 @@ export class OrderWorkflow extends WorkflowEntrypoint {
       const proof = new Uint8Array(await env.FILES.get(rendered.proofKey, 'arrayBuffer'));
       const t = proofEmail(order, data, rev);
       const to = order.source.startsWith('agent-') ? (JSON.parse(order.ship_json || '{}').agent_email || order.email) : order.email;
-      await sendMail(env, { to, subject: t.subject, text: t.text, orderId: order.id, attachments: [jpegAttachment(proof, `House-Almanac-proof-${order.id}.jpg`)] });
+      await sendMail(env, { to, subject: t.subject, text: t.text, orderId: order.id,
+        inlineImage: { bytes: proof, filename: `House-Almanac-proof-${order.id}.jpg`, url: `${env.PUBLIC_BASE}/f/${rendered.proofKey}` } });
       await updateOrder(env, order.id, {
         status: 'proof_sent', data_json: JSON.stringify(data), message,
         file_key: rendered.fileKey, proof_key: rendered.proofKey,

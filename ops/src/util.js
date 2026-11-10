@@ -116,9 +116,16 @@ export async function updateOrder(env, id, fields) {
 export const esc = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export const CODE_VERSION = '2026-11-09.21';
+export const CODE_VERSION = '2026-11-10.22';
 export function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { 'content-type': 'application/json', 'x-ha-version': CODE_VERSION } });
+}
+
+export function base64ToBytes(b64) {
+  const s = atob(String(b64).replace(/\s+/g, ''));
+  const out = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
 }
 
 export function bytesToBase64(bytes) {

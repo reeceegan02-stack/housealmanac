@@ -51,7 +51,7 @@ export function firstEmail(p, offerSample) {
     subject: `A completion gift for ${p.agency} buyers`,
     text: `Hi ${p.agency} team,
 
-I run House Almanac, a Manchester business that makes framed A3 prints of a home's history: the street on an 1890s Ordnance Survey map, the same spot today, a short history and timeline, and a message from you.
+I run House Almanac, a Manchester business that makes framed A3 prints of a home's history: the street on a historic Ordnance Survey map, the same spot today, a short history and timeline, and a message from you.
 
 For agents, each print carries your logo and a QR code to your review page, and arrives framed at your branch ready for key handover. It's £75 a print, then £65 a print after your first order, paid per print with no contract.
 
@@ -94,9 +94,9 @@ export function officePreviewEmail(p, street, offerFree) {
     subject: `The history of ${street}, for ${p.agency}`,
     text: `Hi ${p.agency} team,
 
-I run House Almanac, a Manchester business that makes framed A3 prints of a home's history. To show you what they look like, I made one for your office on ${street}. It's attached.
+I run House Almanac, a Manchester business that makes framed A3 prints of a home's history. To show you what they look like, I made one for your office on ${street}. It's below.
 
-Each print has the street on an 1890s Ordnance Survey map, the same spot today, a short history and timeline, and a personal message.
+Each print has the street on a historic Ordnance Survey map, the same spot today, a short history and timeline, and a personal message.
 
 ${offerFree
   ? `If you'd like it framed for the branch, just reply "yes" and I'll send it to you framed, free of charge.`
@@ -117,7 +117,7 @@ export function officeFollowUpEmail(p, street, offerFree) {
     subject: `Re: The history of ${street}, for ${p.agency}`,
     text: `Hi ${p.agency} team,
 
-Just checking the print of ${street} reached you; it was attached to my last email. ${offerFree
+Just checking the print of ${street} reached you (it was in my last email). ${offerFree
   ? `If you'd like it framed for the branch, reply "yes" and it's yours, free.`
   : `If you'd like it framed for the branch, it's £75 delivered; reply "yes".`}
 
@@ -257,10 +257,9 @@ export async function sendPreviewEmail(env, order, street, proofBytes) {
   const s = await samplesStatus(env);
   const office = JSON.parse(p.office_json || '{}');
   const t = proofBytes ? officePreviewEmail(p, street, s.left > 0) : firstEmail(p, false);
-  const { jpegAttachment } = await import('./mail.js');
   await sendMail(env, {
     to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 6, orderId: order.id,
-    attachments: proofBytes ? [jpegAttachment(proofBytes, `${street.replace(/[^A-Za-z0-9]+/g, '-')}-House-Almanac.jpg`)] : undefined,
+    inlineImage: proofBytes ? { bytes: proofBytes, filename: `${street.replace(/[^A-Za-z0-9]+/g, '-')}-House-Almanac.jpg`, url: order.proof_key ? `${env.PUBLIC_BASE}/f/${order.proof_key}` : null } : undefined,
   });
   await env.DB.prepare(`UPDATE prospects SET status = 'emailed', last_contact = ?, followup_due = ?, office_json = ? WHERE email = ?`)
     .bind(now(), addDays(today(), 7), JSON.stringify({ ...office, street: proofBytes ? street : undefined }), p.email).run();
@@ -317,4 +316,44 @@ export async function startDailyOutreach(env, d = new Date()) {
   } catch (e) {
     return { skipped: 'already ran today' };
   }
+}
+
+// One-off (10 Nov 2026): office prints emailed before the attachment fix arrived as empty files.
+// Resend each one, with the print shown in the email body. dry=true lists them without sending.
+export async function resendPreviews(env, { dry = true, before } = {}) {
+  const cutoff = before || new Date().toISOString();
+  const s = await samplesStatus(env);
+  const { results } = await env.DB.prepare(`SELECT p.email, p.agency, p.status, p.office_json, o.id AS order_id, o.proof_key FROM prospects p
+    JOIN orders o ON o.external_ref = 'preview-' || p.email WHERE o.source = 'agent-preview' AND o.proof_key IS NOT NULL
+    AND p.status NOT IN ('opted_out', 'bounced')`).all();
+  const out = [];
+  for (const r of results) {
+    const office = JSON.parse(r.office_json || '{}');
+    if (!office.street) continue; // that agency got the plain intro email (no picture)
+    const first = await env.DB.prepare(`SELECT at FROM events WHERE kind = 'email_sent' AND lower(json_extract(detail, '$.to')) = lower(?)
+      AND json_extract(detail, '$.subject') LIKE 'The history of %' AND at < ? ORDER BY at LIMIT 1`).bind(r.email, cutoff).first();
+    if (!first) continue;
+    out.push({ agency: r.agency, street: office.street, order: r.order_id, status: r.status, first_sent: first.at });
+    if (dry) continue;
+    const bytes = await env.FILES.get(r.proof_key, 'arrayBuffer');
+    if (!bytes) continue;
+    const when = first.at.slice(0, 10) === new Date().toISOString().slice(0, 10) ? 'this morning' : 'yesterday';
+    await sendMail(env, {
+      to: r.email, subject: `Re: The history of ${office.street}, for ${r.agency}`, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 30, orderId: r.order_id,
+      text: `Hi ${r.agency} team,
+
+Apologies: the picture of ${office.street} didn't come through on my email ${when}. Here it is, the history of your office's street as a House Almanac print.
+
+${s.left > 0 ? `If you'd like it framed for the branch, just reply "yes" and I'll send it to you framed, free of charge.` : `If you'd like it framed for the branch, it's £75 delivered. Just reply "yes".`}
+
+Best wishes,
+Reece Egan-Sheath
+House Almanac · hello@housealmanac.co.uk · housealmanac.co.uk
+
+If this isn't for you, reply "no thanks" and I won't email again.`,
+      inlineImage: { bytes: new Uint8Array(bytes), filename: `${office.street.replace(/[^A-Za-z0-9]+/g, '-')}-House-Almanac.jpg`, url: `${env.PUBLIC_BASE}/f/${r.proof_key}` },
+    });
+    await logEvent(env, r.order_id, 'preview_resent', { agency: r.agency });
+  }
+  return { count: out.length, dry, items: out };
 }

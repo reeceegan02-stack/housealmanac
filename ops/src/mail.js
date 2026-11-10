@@ -1,7 +1,9 @@
 // Outbound email from hello@housealmanac.co.uk (Cloudflare Email Service) and message templates.
-import { BRAND, esc, bytesToBase64, logEvent } from './util.js';
+import { BRAND, esc, base64ToBytes, logEvent } from './util.js';
 
-export async function sendMail(env, { to, subject, text, html, attachments, orderId, fromName = 'House Almanac', bcc = true, dedupeDays = 0 }) {
+// inlineImage: { bytes, filename, url } shows the picture in the email body (cid) and adds a "view it online" link,
+// so it can be seen even where attachments are stripped or blocked.
+export async function sendMail(env, { to, subject, text, html, attachments, inlineImage, orderId, fromName = 'House Almanac', bcc = true, dedupeDays = 0 }) {
   // Outreach guard: never send the same email to the same address twice within dedupeDays (e.g. on a retry).
   if (dedupeDays) {
     const dup = await env.DB.prepare(`SELECT 1 FROM events WHERE kind = 'email_sent' AND lower(json_extract(detail, '$.to')) = lower(?) AND json_extract(detail, '$.subject') = ? AND at >= ? LIMIT 1`)
@@ -13,22 +15,25 @@ export async function sendMail(env, { to, subject, text, html, attachments, orde
     from: { email: BRAND.from, name: fromName },
     replyTo: BRAND.from,
     subject,
-    text,
-    html: html || textToHtml(text),
+    text: inlineImage?.url ? `${text}\n\n(If the picture doesn't show, view it here: ${inlineImage.url})` : text,
+    html: html || textToHtml(text) + (inlineImage ? `<p style="margin:18px 0 6px"><img src="cid:print" alt="${esc(inlineImage.filename)}" width="460" style="max-width:100%;height:auto;border:1px solid #ddd2bf"></p>${inlineImage.url ? `<p style="font-family:Arial,sans-serif;font-size:13px;color:#62584c">Can't see the picture? <a href="${esc(inlineImage.url)}" style="color:#9c3f2a">View it here</a>.</p>` : ''}` : ''),
   };
   if (bcc && to !== BRAND.from) msg.bcc = BRAND.from; // keep a copy in the inbox
-  if (attachments && attachments.length) msg.attachments = attachments;
+  // Attachments go to the Email Service as raw bytes: base64 strings arrived as empty files (found 10 Nov 2026).
+  const atts = [...(attachments || [])];
+  if (inlineImage) atts.push({ content: inlineImage.bytes, filename: inlineImage.filename, type: inlineImage.type || 'image/jpeg', disposition: 'inline', contentId: 'print' });
+  if (atts.length) msg.attachments = atts.map(a => ({ ...a, content: typeof a.content === 'string' ? base64ToBytes(a.content) : a.content }));
   const res = await env.EMAIL.send(msg);
   await logEvent(env, orderId, 'email_sent', { to, subject, id: res?.messageId });
   return res;
 }
 
 export function textToHtml(text) {
-  const paras = String(text).split(/\n{2,}/).map(p => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, '<br>').replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#9c3f2a">$1</a>')}</p>`);
+  const paras = String(text).split(/\n{2,}/).map(p => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, '<br>').replace(/(https?:\/\/[^\s<]+?)([).,;:!?]*)(?=\s|<|$)/g, '<a href="$1" style="color:#9c3f2a">$1</a>$2')}</p>`);
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#2a241e;max-width:600px">${paras.join('')}</div>`;
 }
 
-export const jpegAttachment = (bytes, filename) => ({ content: bytesToBase64(bytes), filename, type: 'image/jpeg', disposition: 'attachment' });
+export const jpegAttachment = (bytes, filename) => ({ content: bytes, filename, type: 'image/jpeg', disposition: 'attachment' });
 
 const sig = `Best wishes,
 Reece
@@ -56,7 +61,7 @@ export function proofEmail(order, data, revision) {
     subject: `Your proof is ready [${order.id}]${revision ? ` (version ${revision + 1})` : ''}`,
     text: `Hi ${firstName(order.name)},
 
-${revision ? 'Here is the updated proof with your changes.' : `Here is the proof of your House Almanac print for ${data.title}.`} It's attached as a low-resolution image; the printed version is full A3 at 300 dpi, without the "PROOF" mark.
+${revision ? 'Here is the updated proof with your changes.' : `Here is the proof of your House Almanac print for ${data.title}.`} It's below (and attached) as a low-resolution image; the printed version is full A3 at 300 dpi, without the "PROOF" mark.
 
 Please check:
 - the spelling of names and your message

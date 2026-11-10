@@ -148,6 +148,24 @@ async function admin(req, env, url) {
   if (p === '/outreach/run' && req.method === 'POST') return json(await startDailyOutreach(env, new Date()));
   if (p === '/outreach/find' && req.method === 'POST') return json(await findProspects(env, body.area));
   if (p === '/samples') return json(await samplesStatus(env));
+  if (p === '/outreach/resend-previews' && req.method === 'POST') {
+    const { resendPreviews } = await import('./outreach.js');
+    return json(await resendPreviews(env, { dry: body.dry !== false, before: body.before }));
+  }
+  if (p.startsWith('/order/') && p.endsWith('/resend-proof') && req.method === 'POST') {
+    // Re-send an order's latest proof (shown in the email body) with a short apology line.
+    const id = p.split('/')[2];
+    const o = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first();
+    if (!o?.proof_key) return json({ error: 'no proof' }, 404);
+    const { proofEmail, sendMail: send } = await import('./mail.js');
+    const data = JSON.parse(o.data_json || '{}');
+    const t = proofEmail(o, data, o.revision || 0);
+    const to = o.source.startsWith('agent-') ? (JSON.parse(o.ship_json || '{}').agent_email || o.email) : o.email;
+    const bytes = new Uint8Array(await env.FILES.get(o.proof_key, 'arrayBuffer'));
+    await send(env, { to, subject: t.subject, orderId: o.id, text: `Apologies: the picture didn't come through on my last email, so here it is again.\n\n${t.text}`,
+      inlineImage: { bytes, filename: `House-Almanac-proof-${o.id}.jpg`, url: `${env.PUBLIC_BASE}/f/${o.proof_key}` } });
+    return json({ resent: to });
+  }
   if (p === '/vouchers') return json((await env.DB.prepare('SELECT * FROM vouchers ORDER BY created_at DESC LIMIT 100').all()).results);
   if (p === '/voucher/test' && req.method === 'POST') {
     // A voucher without a Stripe payment (session_id 'test-...'), to check the PDF, the email and redemption.

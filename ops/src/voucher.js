@@ -106,7 +106,7 @@ async function emailVoucher(env, code, pdfKey) {
   if (pdfKey) {
     const bytes = await env.FILES.get(pdfKey, 'arrayBuffer');
     if (bytes) {
-      attachments = [{ content: bytesToBase64(new Uint8Array(bytes)), filename: `House-Almanac-gift-voucher-${code}.pdf`, type: 'application/pdf', disposition: 'attachment' }];
+      attachments = [{ content: new Uint8Array(bytes), filename: `House-Almanac-gift-voucher-${code}.pdf`, type: 'application/pdf', disposition: 'attachment' }];
       link = `${env.PUBLIC_BASE}/f/${pdfKey}`;
     }
   }
