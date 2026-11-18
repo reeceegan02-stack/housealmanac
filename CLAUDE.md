@@ -68,13 +68,13 @@ Gift vouchers (9 Nov): framed £89 https://buy.stripe.com/28EcN74IxdtKebS2GD2wU0
   applies commands from GET /ads/commands (negatives, pause/enable, offline conversions). Daily ops agent reviews search terms and queues negatives
   (add_ads_negatives, guarded so it can never block our keywords); status.json → google_ads (aggregates, no search terms); weekly update shows
   spend vs the £280 cap. Admin: GET /admin/ads, POST /admin/ads/command {negatives|pause|enable}, POST /admin/ads/offline {enabled}.
-  **Sales tracking: not live yet.** (a) Tag route: Purchase AW-18582430154/5cGlCKi737odEMrD5ZxF fires on site/thanks.html, but the Stripe
-  payment links don't redirect there: the restricted key lacks Payment Links read/write and the House Almanac Stripe login isn't in Chrome
-  (Chrome is signed in to Reece's Refined Business Consulting Stripe account; never use that one). Cron retry is switched off.
-  (b) Import route, ready in code: site/ads.js adds client_reference_id=g-<gclid> to Stripe links for visitors who accepted cookies;
-  ingestStripeSession records it (D1 ad_conversions); the script uploads them as offline conversions named "Stripe purchase (import)".
-  Needs: that conversion action created in Goals → Conversions (offline, "set up data source later"), which requires ticking Google's EU user
-  consent policy declaration = Reece's explicit yes; then POST /admin/ads/offline {enabled:true}. Use (a) or (b), not both (double counting).
+  **Sales tracking LIVE 18 Nov 15:10 (import route)**: Reece said yes to Google's EU user consent policy declaration. Conversion action
+  "Stripe purchase (import)" (Import from clicks, Purchase, primary, every, 90 days, value from each sale, default £39). site/ads.js adds
+  client_reference_id=g-<gclid> to Stripe links only for visitors who accepted cookies (tested); ingestStripeSession records it in D1
+  ad_conversions; /ads/commands lists pending ones (kv ads_offline_enabled=true); the hourly script uploads them and reports back.
+  The older website-tag action "Purchase" (fires on /thanks) is also primary but never fires, because Stripe can't redirect there (restricted key
+  lacks Payment Links permissions; Chrome's Stripe login is Reece's Refined Business Consulting account, never use it). If redirects are
+  ever added, make "Purchase" secondary to avoid double counting.
 
 ## Automation (runs 24/7 in Cloudflare, no laptop needed)
 Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `main` via Workers Builds, root `/ops`).
