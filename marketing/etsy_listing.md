@@ -15,7 +15,7 @@ Personalised House History Print, Old Map of Your Street Then and Now, New Home 
 Free UK delivery on both. Quantity: 99.
 
 **Personalisation (required)** — instructions shown to buyer:
-"Please give: 1) the full address and postcode, 2) the year you moved in (or 'gift'), 3) a short message for the bottom of the print, up to 120 characters, and who it's from. We email a proof before printing; if we haven't heard back within 2 days, we print it as shown so it arrives on time."
+"Please give: 1) the full address and postcode, 2) the year you moved in (or 'gift'), 3) a short message for the bottom of the print, up to 120 characters, and who it's from. We check every detail before printing." (No proof on Etsy: the live listing doesn't offer one, so Etsy orders print straight after the automatic check.)
 Character limit: 400.
 
 **Processing time:** 3–5 working days (proof within 2 working days, then 2–3 days to print). Delivery 1–3 days.

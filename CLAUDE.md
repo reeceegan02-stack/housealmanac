@@ -108,8 +108,7 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **Etsy**: CONNECTED 10 Nov 2026 (app "house-almanac-orders" approved, callback added, access allowed; /admin/check shows etsy.connected). Forwarding sale emails is no longer needed. The cron pings the API every 30 min; when the key goes
   live it emails hello@ the last two steps (add callback URL https://housealmanac-ops.reeceegan02.workers.dev/etsy/callback in the app, then
   Reece opens /etsy/connect and clicks Allow). Reece must paste ETSY_KEYSTRING + ETSY_SHARED_SECRET as Build secrets (never enter keys yourself).
-  Once connected: cron pulls paid receipts → workflow → proof emailed if Etsy gives the buyer's email (printed automatically if no reply in 48 h,
-  as the listing says), otherwise printed straight after the automatic check → tracking to Etsy.
+  Once connected: cron pulls paid receipts → workflow → printed straight after the automatic check (the live listing offers no proof) → tracking to Etsy.
   Stopgap until then: Reece forwards Etsy's "You made a sale" email to hello@ and the inbox creates the order (external_ref etsy-<receipt>, so no duplicates later).
 
 ## Agents (monitoring, maintenance, growth) — nothing depends on Reece's laptop

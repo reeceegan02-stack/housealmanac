@@ -17,7 +17,7 @@ import { voucherSafetyNet } from './voucher.js';
 export async function runScheduled(event, env) {
   await ensureSchema(env);
   const d = new Date(event.scheduledTime || Date.now());
-  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env), voucherSafetyNet(env), etsyAutoApprove(env)];
+  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env), voucherSafetyNet(env)];
   if (d.getUTCHours() === 10 && d.getUTCMinutes() < 30) jobs.push(startDailyOutreach(env, d));
   if (d.getUTCDay() === 1 && d.getUTCHours() === 9 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env)); // after the growth agent, so its plan is included
   if (d.getUTCHours() === 7 && d.getUTCMinutes() < 30) jobs.push(startAgent(env, 'ops', d.toISOString().slice(0, 10)));
@@ -75,22 +75,6 @@ async function creditWatch(env) {
     to: BRAND.from, bcc: false, subject: 'ACTION NEEDED: Claude API credit is nearly used up',
     text: `By our estimate about $${used.toFixed(2)} of the $${PREPAID_USD} prepaid Claude API credit has been used. When it runs out, new orders stop at the research step.\n\nTop up at platform.claude.com → Billing & payments → Buy credits (or turn on auto-reload).`,
   });
-}
-
-// Etsy proofs: the listing promises we print if the buyer hasn't replied within 2 days.
-async function etsyAutoApprove(env) {
-  const { createPrintOrder } = await import('./prodigi.js');
-  const { fileUrl } = await import('./util.js');
-  const due = (await env.DB.prepare(`SELECT * FROM orders WHERE source = 'etsy' AND status = 'proof_sent' AND updated_at < ? LIMIT 5`)
-    .bind(new Date(Date.now() - 48 * 3600e3).toISOString()).all()).results;
-  for (const o of due) {
-    try {
-      const po = await createPrintOrder(env, o, fileUrl(env, o.file_key));
-      await updateOrder(env, o.id, { status: 'printing', prodigi_id: po.id });
-      await logEvent(env, o.id, 'prodigi_order', { id: po.id, auto: 'etsy_no_reply_48h' });
-    } catch (e) { await logEvent(env, o.id, 'etsy_auto_approve_error', e.message); }
-  }
-  return { autoApproved: due.length };
 }
 
 export async function weeklySummary(env, { dry = false } = {}) {

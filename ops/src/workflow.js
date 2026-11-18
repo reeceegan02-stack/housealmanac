@@ -94,8 +94,8 @@ export class OrderWorkflow extends WorkflowEntrypoint {
       return { status: 'needs_attention', qa };
     }
 
-    if (order.source === 'etsy' && rev === 0 && !order.email) {
-      // No email from Etsy for this buyer, so no proof can be sent: print straight after the automatic check.
+    if (order.source === 'etsy' && rev === 0) {
+      // The Etsy listing doesn't offer a proof (it says we check every detail), so print straight after the automatic check.
       await step.do('print etsy order', R(3, '2 minutes'), async () => {
         await updateOrder(env, order.id, { data_json: JSON.stringify(data), message, file_key: rendered.fileKey, proof_key: rendered.proofKey, status: 'approved' });
         const po = await createPrintOrder(env, { ...order, revision: rev }, `${env.PUBLIC_BASE}/f/${rendered.fileKey}`);
