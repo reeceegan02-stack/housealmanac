@@ -17,7 +17,7 @@ import { voucherSafetyNet } from './voucher.js';
 export async function runScheduled(event, env) {
   await ensureSchema(env);
   const d = new Date(event.scheduledTime || Date.now());
-  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env), voucherSafetyNet(env)];
+  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env), voucherSafetyNet(env), sampleFollowUp(env)];
   if (d.getUTCHours() === 10 && d.getUTCMinutes() < 30) jobs.push(startDailyOutreach(env, d));
   if (d.getUTCDay() === 1 && d.getUTCHours() === 9 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env)); // after the growth agent, so its plan is included
   if (d.getUTCHours() === 7 && d.getUTCMinutes() < 30) jobs.push(startAgent(env, 'ops', d.toISOString().slice(0, 10)));
@@ -49,6 +49,37 @@ async function checkShipping(env) {
   }
   // mark delivered 10 days after shipping (for print-file clean-up timing)
   await env.DB.prepare(`UPDATE orders SET status = 'delivered' WHERE status = 'shipped' AND updated_at < datetime('now', '-10 days')`).run();
+}
+
+// Free framed samples are only worth it if they turn into orders: 4 days after one ships, ask the agency for
+// their next buyer (free proof, then £75 framed). Once per sample.
+async function sampleFollowUp(env) {
+  const { results } = await env.DB.prepare(`SELECT * FROM orders WHERE source = 'agent-sample' AND status IN ('shipped', 'delivered') AND updated_at < ? LIMIT 10`)
+    .bind(new Date(Date.now() - 4 * 86400e3).toISOString()).all();
+  for (const o of results) {
+    const key = `sample_followup_${o.id}`;
+    if (await kvGet(env, key)) continue;
+    await kvSet(env, key, now());
+    const ship = JSON.parse(o.ship_json || '{}');
+    const to = ship.agent_email || o.email;
+    const p = to ? await env.DB.prepare('SELECT status FROM prospects WHERE email = ?').bind(to).first() : null;
+    if (!to || ['opted_out', 'bounced'].includes(p?.status)) continue;
+    let street = ''; try { street = JSON.parse(o.data_json || '{}').title || ''; } catch {}
+    street = street || String(o.address || '').split(',')[0];
+    await sendMail(env, {
+      to, orderId: o.id, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 30,
+      subject: `Your framed print of ${street}`,
+      text: `Hi ${o.name} team,
+
+I hope the framed print of ${street} arrived safely and has found a spot in the branch.
+
+When your next sale completes, send me the buyer's new address and their names (and a line from you, if you like), and I'll email you a free proof. If you're happy with it, it's £75 framed and delivered to your branch, with your logo and a QR code to your reviews, then £65 each after your first order.
+
+Best wishes,
+Reece Egan-Sheath
+House Almanac · hello@housealmanac.co.uk · housealmanac.co.uk`,
+    });
+  }
 }
 
 async function retryStuck(env) {
