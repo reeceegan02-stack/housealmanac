@@ -8,10 +8,12 @@ import { createPrintOrder } from './prodigi.js';
 import { approvedEmail } from './mail.js';
 import { maybeSendAgencyCode } from './agents.js';
 import { isVoucherSession, createVoucherFromSession } from './voucher.js';
+import { recordAdClick } from './ads.js';
 
 export async function ingestStripeSession(env, sessionId) {
   const s = await stripeGet(env, `/checkout/sessions/${sessionId}`);
   if (s.payment_status !== 'paid') return { skipped: 'not paid' };
+  await recordAdClick(env, s);
   if (isVoucherSession(s)) return createVoucherFromSession(env, s); // gift voucher: emailed as a PDF, redeemed later
   // Agent paying for a proof we already made (link carries ?client_reference_id=HA-XXXXXX).
   if (s.client_reference_id) {

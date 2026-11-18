@@ -52,6 +52,7 @@ const SCHEMA = [
     notes TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)`,
+  `CREATE TABLE IF NOT EXISTS ad_conversions (session_id TEXT PRIMARY KEY, gclid TEXT, at TEXT, value_pence INTEGER, kind TEXT, uploaded_at TEXT, upload_error TEXT)`,
 ];
 
 // Additive changes to existing tables (each runs once; "duplicate column" errors are ignored).
@@ -116,7 +117,7 @@ export async function updateOrder(env, id, fields) {
 export const esc = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export const CODE_VERSION = '2026-11-18.26';
+export const CODE_VERSION = '2026-11-18.27';
 export function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), { status, headers: { 'content-type': 'application/json', 'x-ha-version': CODE_VERSION } });
 }

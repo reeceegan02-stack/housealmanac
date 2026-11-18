@@ -64,6 +64,23 @@ const SCRIPT = String.raw`(function () {
         catch (e) { out.errors.push('negative ' + t + ': ' + String(e).slice(0, 200)); }
       });
     });
+    // Sales from ad clicks: upload as offline conversions (the conversion action must be "Import: conversions from clicks").
+    out.uploaded = [];
+    if ((cmd.conversions || []).length && cmd.conversion_name) {
+      try {
+        var up = AdsApp.bulkUploads().newCsvUpload(['Google Click ID', 'Conversion Name', 'Conversion Time', 'Conversion Value', 'Conversion Currency'],
+          { moneyInMicros: false, timeZone: 'Europe/London' });
+        up.forOfflineConversions();
+        up.setFileName('House Almanac sales ' + today);
+        cmd.conversions.forEach(function (cv) {
+          up.append({ 'Google Click ID': cv.gclid, 'Conversion Name': cmd.conversion_name,
+            'Conversion Time': Utilities.formatDate(new Date(cv.at), 'Europe/London', 'yyyyMMdd HHmmss'),
+            'Conversion Value': cv.value, 'Conversion Currency': 'GBP' });
+        });
+        if (out.preview) up.preview(); else up.apply();
+        cmd.conversions.forEach(function (cv) { out.uploaded.push(cv.id); });
+      } catch (e) { out.errors.push('conversions: ' + String(e).slice(0, 300)); }
+    }
     (cmd.pause || []).forEach(function (id) { if (camps[id] && camps[id].isEnabled()) { camps[id].pause(); out.applied.push({ campaign: id, paused: true }); } });
     (cmd.enable || []).forEach(function (id) { if (camps[id] && camps[id].isPaused()) { camps[id].enable(); out.applied.push({ campaign: id, enabled: true }); } });
   } catch (e) { out.errors.push('commands: ' + String(e).slice(0, 300)); }
@@ -79,6 +96,23 @@ export function adsScript(env) {
     { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
 }
 
+// ---------- offline conversions (sales reported back to Google with the ad click id) ----------
+export const ADS_CONVERSION_NAME = 'Stripe purchase (import)';
+// site/ads.js adds ?client_reference_id=g-<gclid> to Stripe links when the visitor came from an ad.
+export async function recordAdClick(env, s) {
+  const ref = String(s.client_reference_id || '');
+  if (!ref.startsWith('g-')) return;
+  const gclid = ref.slice(2).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 190);
+  if (gclid.length < 10) return;
+  await env.DB.prepare('INSERT OR IGNORE INTO ad_conversions (session_id, gclid, at, value_pence, kind) VALUES (?,?,?,?,?)')
+    .bind(s.id, gclid, new Date((s.created || Date.now() / 1000) * 1000).toISOString(), s.amount_total || 0, s.payment_link || '').run();
+}
+export async function pendingConversions(env) {
+  const { results } = await env.DB.prepare(`SELECT session_id, gclid, at, value_pence FROM ad_conversions WHERE uploaded_at IS NULL AND at >= ? ORDER BY at LIMIT 100`)
+    .bind(new Date(Date.now() - 60 * 86400e3).toISOString()).all();
+  return results;
+}
+
 // ---------- commands ----------
 async function getCommands(env) {
   try { return JSON.parse(await kvGet(env, 'ads_commands') || '{}'); } catch { return {}; }
@@ -88,7 +122,10 @@ async function setCommands(env, c) {
 }
 export async function adsCommands(env) {
   const c = await getCommands(env);
-  return json({ negatives: (c.negatives || []).map(n => ({ text: n.text, match: n.match })), pause: c.pause || [], enable: c.enable || [] });
+  const conv = await pendingConversions(env).catch(() => []);
+  return json({ negatives: (c.negatives || []).map(n => ({ text: n.text, match: n.match })), pause: c.pause || [], enable: c.enable || [],
+    conversion_name: ADS_CONVERSION_NAME,
+    conversions: conv.map(x => ({ id: x.session_id.slice(-12), gclid: x.gclid, at: x.at, value: x.value_pence / 100 })) });
 }
 
 const words = (s) => String(s).toLowerCase().replace(/[^a-z0-9&' ]+/g, ' ').split(/\s+/).filter(Boolean);
@@ -142,6 +179,7 @@ function clean(r) {
   return {
     at: S(r.at, 40), today: S(r.today, 10), preview: !!r.preview,
     errors: arr(r.errors, 20, x => S(x, 300)),
+    uploaded: arr(r.uploaded, 100, x => S(x, 20)),
     applied: arr(r.applied, 80, x => ({ campaign: S(x.campaign, 20), negative: x.negative ? S(x.negative, 80) : undefined, paused: !!x.paused || undefined, enabled: !!x.enabled || undefined })),
     days: arr(r.days, 400, d => ({ date: S(d.date, 10), campaign: S(d.campaign, 20), impressions: N(d.impressions), clicks: N(d.clicks), cost: N(d.cost), conversions: N(d.conversions), value: N(d.value) })),
     campaigns: arr(r.campaigns, 20, c => ({ id: S(c.id, 20), name: S(c.name, 80), status: S(c.status, 20), serving: S(c.serving, 30), primary: S(c.primary, 30), reasons: arr(c.reasons, 10, x => S(x, 50)) })),
@@ -164,6 +202,10 @@ export async function adsReport(req, env) {
   const c = clean(r);
   await kvSet(env, 'ads_report', JSON.stringify(c));
   if (!c.preview) {
+    for (const id of c.uploaded) {
+      await env.DB.prepare(`UPDATE ad_conversions SET uploaded_at = ? WHERE substr(session_id, -12) = ? AND uploaded_at IS NULL`).bind(new Date().toISOString(), id).run();
+    }
+    if (c.uploaded.length) await logEvent(env, null, 'ads_conversions_uploaded', { n: c.uploaded.length });
     if (c.applied.length) await logEvent(env, null, 'ads_applied', c.applied.slice(0, 40));
     // Pause/enable commands are one-shot: clear the ones that took effect.
     const cmd = await getCommands(env);
@@ -206,6 +248,7 @@ export async function adsSummary(env) {
     negatives: (r.negatives || []).length,
     pending_negatives: ((await getCommands(env)).negatives || []).length,
     script_errors: (r.errors || []).slice(0, 5),
+    ad_sales: await env.DB.prepare(`SELECT count(*) n, sum(uploaded_at IS NOT NULL) uploaded, coalesce(sum(value_pence), 0) value_pence FROM ad_conversions`).first().catch(() => null),
   };
 }
 

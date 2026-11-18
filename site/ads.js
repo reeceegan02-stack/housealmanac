@@ -17,6 +17,28 @@
   s.src = 'https://www.googletagmanager.com/gtag/js?id=' + AW;
   document.head.appendChild(s);
 
+  // Carry the Google Ads click id into Stripe checkout (client_reference_id), so a sale can be reported back to
+  // Google from our server. Nothing is stored in the browser: the id comes from this page's URL (or Google's own
+  // cookie when the visitor accepted cookies).
+  function clickId() {
+    var m = location.search.match(/[?&]gclid=([A-Za-z0-9_-]{10,180})/);
+    if (m) return m[1];
+    var c = document.cookie.match(/(?:^|; )_gcl_aw=GCL\.\d+\.([A-Za-z0-9_-]{10,180})/);
+    return c ? c[1] : null;
+  }
+  function tagLinks() {
+    var id = clickId();
+    if (!id) return;
+    var links = document.querySelectorAll('a[href^="https://buy.stripe.com/"]');
+    for (var i = 0; i < links.length; i++) {
+      var a = links[i];
+      if (/client_reference_id=/.test(a.href)) continue;
+      a.href += (a.href.indexOf('?') < 0 ? '?' : '&') + 'client_reference_id=g-' + id;
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tagLinks); else tagLinks();
+  window.addEventListener('pageshow', tagLinks);
+
   if (saved) return;
   function choose(v) {
     try { localStorage.setItem('ha_consent', v); } catch (e) {}
