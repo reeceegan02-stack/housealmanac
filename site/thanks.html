@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thank you — House Almanac</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Lora:wght@700&display=swap" rel="stylesheet">
+<script src="/ads.js"></script>
+<style>
+body{margin:0;background:#f6f1e7;color:#2a241e;font:17px/1.6 Inter,system-ui,sans-serif}
+main{max-width:640px;margin:0 auto;padding:56px 20px 80px}
+a{color:#9c3f2a}
+.logo{font:700 20px Lora,serif;color:#2a241e;text-decoration:none}
+h1{font:700 clamp(32px,5vw,44px)/1.15 Lora,serif;margin:40px 0 12px}
+.card{background:#fffdf8;border:1px solid #ddd2bf;border-radius:14px;padding:22px 24px;margin-top:22px}
+.card ol{margin:8px 0 0;padding-left:20px}
+.note{font-size:14px;color:#62584c;margin-top:26px}
+</style>
+</head>
+<body>
+<main>
+<a class="logo" href="/">House Almanac</a>
+<h1 id="h">Thank you for your order.</h1>
+<p id="lead">We've started researching your street. Your proof will arrive by email within 2 working days.</p>
+<div class="card" id="next"><strong>What happens next</strong>
+<ol id="steps"><li>We research the history of your street and design your print.</li><li>You get a proof by email. Reply "approved", or tell us what to change.</li><li>We print it and deliver it free, usually within 3 to 5 working days of your approval.</li></ol></div>
+<p class="note">A receipt is on its way from Stripe. Questions? Email <a href="mailto:hello@housealmanac.co.uk">hello@housealmanac.co.uk</a>.</p>
+</main>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var p = q.get('p') || '';
+  var sid = q.get('sid') || '';
+  var values = { framed: 89, unframed: 39, 'voucher-framed': 89, 'voucher-unframed': 39 };
+  if (/^voucher/.test(p)) {
+    document.getElementById('h').textContent = 'Thank you. Your gift voucher is on its way.';
+    document.getElementById('lead').textContent = "It's being emailed to you as a printable PDF, usually within 10 minutes (check your spam folder if it hasn't arrived).";
+    document.getElementById('steps').innerHTML = '<li>Print it or forward the email to them.</li><li>They redeem it at housealmanac.co.uk/redeem with the address of their home.</li><li>We research it, email them a proof, then print and deliver it free.</li>';
+  }
+  // Count the sale once per checkout (refreshing this page doesn't count it again).
+  var key = 'ha_conv_' + (sid || 'none');
+  var done = false; try { done = !!sessionStorage.getItem(key); } catch (e) {}
+  if (values[p] && !done && window.gtag) {
+    gtag('event', 'conversion', { send_to: 'AW-18582430154/5cGlCKi737odEMrD5ZxF', value: values[p], currency: 'GBP', transaction_id: sid });
+    try { sessionStorage.setItem(key, '1'); } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>
