@@ -46,7 +46,7 @@ export class OrderWorkflow extends WorkflowEntrypoint {
       data = JSON.parse(order.data_json);
     } else {
       data = await step.do('research', { ...R(2, '1 minute'), timeout: '20 minutes' }, async () => {
-        const office = order.source === 'agent-preview' ? { purpose: 'office', agency: order.name, searches: 6 } : {};
+        const office = order.source === 'agent-preview' ? { purpose: 'office', agency: order.name, searches: 4 } : {};
         const d = await researchStreet(env, { ...geo, address: order.address, moveIn: order.move_in, message: order.message, sales, ...office });
         await updateOrder(env, order.id, { data_json: JSON.stringify(d) });
         return d;
@@ -94,8 +94,8 @@ export class OrderWorkflow extends WorkflowEntrypoint {
       return { status: 'needs_attention', qa };
     }
 
-    if (order.source === 'etsy' && rev === 0) {
-      // Etsy buyers can't be emailed a proof, so print straight after the automatic check.
+    if (order.source === 'etsy' && rev === 0 && !order.email) {
+      // No email from Etsy for this buyer, so no proof can be sent: print straight after the automatic check.
       await step.do('print etsy order', R(3, '2 minutes'), async () => {
         await updateOrder(env, order.id, { data_json: JSON.stringify(data), message, file_key: rendered.fileKey, proof_key: rendered.proofKey, status: 'approved' });
         const po = await createPrintOrder(env, { ...order, revision: rev }, `${env.PUBLIC_BASE}/f/${rendered.fileKey}`);

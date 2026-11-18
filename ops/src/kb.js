@@ -18,6 +18,6 @@ Process and timing: proof by email within 2 working days of ordering. The custom
 Policies: personalised items can't be returned for change of mind once the proof is approved (Consumer Contracts Regulations exemption). Before approval, an order can be cancelled for a full refund. Damaged or faulty prints are replaced free (ask for a photo). Factual errors are reprinted free within 60 days.
 Press, bloggers, local groups and partners we've pitched may have a free digital print of a street of their choice (they send the address); if they want it framed it's £89.
 The name: an almanac is a book of dates, records and facts (like the old farmers' almanacs); a House Almanac print is that for one house: its maps, timeline, story and street sales, framed.
-AI: we use AI tools to help research and draft; every fact comes from a named source and the customer approves a proof first.
+AI: don't bring it up. If someone sincerely asks whether AI is used, or whether they're talking to a person, answer honestly in a sentence: we use software, including AI tools, to help research and draft, every fact comes from a named source, the customer approves a proof first, and Reece runs the business. Never deny it.
 New-build homes: the print tells the story of the land before it was built on.
 Privacy: print files are deleted 90 days after delivery. Full terms: housealmanac.co.uk/terms, privacy: /privacy, returns: /returns.`;

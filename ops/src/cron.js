@@ -17,11 +17,11 @@ import { voucherSafetyNet } from './voucher.js';
 export async function runScheduled(event, env) {
   await ensureSchema(env);
   const d = new Date(event.scheduledTime || Date.now());
-  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env), voucherSafetyNet(env)];
+  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env), voucherSafetyNet(env), etsyAutoApprove(env)];
   if (d.getUTCHours() === 10 && d.getUTCMinutes() < 30) jobs.push(startDailyOutreach(env, d));
-  if (d.getUTCDay() === 1 && d.getUTCHours() === 8 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env));
+  if (d.getUTCDay() === 1 && d.getUTCHours() === 9 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env)); // after the growth agent, so its plan is included
   if (d.getUTCHours() === 7 && d.getUTCMinutes() < 30) jobs.push(startAgent(env, 'ops', d.toISOString().slice(0, 10)));
-  if (d.getUTCDay() === 1 && d.getUTCHours() === 9 && d.getUTCMinutes() < 30) jobs.push(startAgent(env, 'growth', d.toISOString().slice(0, 10)));
+  if (d.getUTCDay() === 1 && d.getUTCHours() === 7 && d.getUTCMinutes() < 30) jobs.push(startAgent(env, 'growth', d.toISOString().slice(0, 10)));
   const results = await Promise.allSettled(jobs);
   for (const r of results) if (r.status === 'rejected') await logEvent(env, null, 'cron_error', String(r.reason?.message || r.reason));
   try { await buildStatus(env); } catch (e) { await logEvent(env, null, 'cron_error', 'status: ' + e.message); }
@@ -77,36 +77,72 @@ async function creditWatch(env) {
   });
 }
 
-export async function weeklySummary(env) {
+// Etsy proofs: the listing promises we print if the buyer hasn't replied within 2 days.
+async function etsyAutoApprove(env) {
+  const { createPrintOrder } = await import('./prodigi.js');
+  const { fileUrl } = await import('./util.js');
+  const due = (await env.DB.prepare(`SELECT * FROM orders WHERE source = 'etsy' AND status = 'proof_sent' AND updated_at < ? LIMIT 5`)
+    .bind(new Date(Date.now() - 48 * 3600e3).toISOString()).all()).results;
+  for (const o of due) {
+    try {
+      const po = await createPrintOrder(env, o, fileUrl(env, o.file_key));
+      await updateOrder(env, o.id, { status: 'printing', prodigi_id: po.id });
+      await logEvent(env, o.id, 'prodigi_order', { id: po.id, auto: 'etsy_no_reply_48h' });
+    } catch (e) { await logEvent(env, o.id, 'etsy_auto_approve_error', e.message); }
+  }
+  return { autoApproved: due.length };
+}
+
+export async function weeklySummary(env, { dry = false } = {}) {
+  // Reece's one regular email: what happened this week, in numbers, and anything that needs him.
   const since = new Date(Date.now() - 7 * 86400e3).toISOString();
-  const orders = await env.DB.prepare(`SELECT status, count(*) n, sum(amount_pence) p FROM orders WHERE created_at >= ? AND source NOT IN ('agent-preview','test') GROUP BY status`).bind(since).all();
-  const previews = (await env.DB.prepare(`SELECT count(*) n FROM orders WHERE created_at >= ? AND source IN ('agent-preview','agent-sample') AND amount_pence = 0`).bind(since).first()).n;
-  const attention = await env.DB.prepare(`SELECT id, address, notes FROM orders WHERE status = 'needs_attention'`).all();
-  const prospects = await env.DB.prepare(`SELECT status, count(*) n FROM prospects GROUP BY status`).all();
-  const sentWeek = (await env.DB.prepare(`SELECT count(*) n FROM events WHERE kind = 'email_sent' AND at >= ? AND detail LIKE '%completion gift%'`).bind(since).first()).n;
+  const one = async (sql, ...b) => env.DB.prepare(sql).bind(...b).first();
+  const all = async (sql, ...b) => (await env.DB.prepare(sql).bind(...b).all()).results;
+  const paid = await one(`SELECT count(*) n, coalesce(sum(amount_pence), 0) p FROM orders WHERE created_at >= ? AND amount_pence > 0 AND source != 'test'`, since);
+  const paidAll = await one(`SELECT count(*) n, coalesce(sum(amount_pence), 0) p FROM orders WHERE amount_pence > 0 AND source != 'test'`);
+  const vouchers = await one(`SELECT count(*) n, coalesce(sum(amount_pence), 0) p FROM vouchers WHERE created_at >= ? AND session_id NOT LIKE 'test-%'`, since);
+  const printed = await all(`SELECT o.product, count(*) n FROM events e JOIN orders o ON o.id = e.order_id WHERE e.kind = 'prodigi_order' AND e.at >= ? GROUP BY o.product`, since);
+  const printCost = printed.reduce((a, r) => a + r.n * (r.product === 'framed' ? 51.30 : 15.48), 0);
+  const attention = await all(`SELECT id, notes FROM orders WHERE status = 'needs_attention'`);
+  const newAgencies = (await one(`SELECT count(*) n FROM events WHERE kind = 'email_sent' AND at >= ? AND (detail LIKE '%"subject":"The history of %' OR detail LIKE '%"subject":"A completion gift%')`, since)).n;
+  const followUps = (await one(`SELECT count(*) n FROM events WHERE kind = 'email_sent' AND at >= ? AND detail LIKE '%"subject":"Re: %' AND (detail LIKE '%The history of%' OR detail LIKE '%completion gift%')`, since)).n;
+  const prospects = await all(`SELECT status, count(*) n FROM prospects GROUP BY status`);
+  const total = prospects.filter(r => r.status !== 'unverified').reduce((a, r) => a + r.n, 0);
+  const st = Object.fromEntries(prospects.map(r => [r.status, r.n]));
+  const replies = await all(`SELECT json_extract(detail, '$.intent') intent, count(*) n FROM events WHERE kind = 'agent_mail' AND at >= ? GROUP BY intent`, since);
   const samples = await samplesStatus(env);
-  const vouchers = await env.DB.prepare(`SELECT count(*) n, coalesce(sum(amount_pence), 0) p FROM vouchers WHERE created_at >= ? AND session_id NOT LIKE 'test-%'`).bind(since).first();
-  const redeemed = (await env.DB.prepare(`SELECT count(*) n FROM vouchers WHERE redeemed_at >= ? AND session_id NOT LIKE 'test-%'`).bind(since).first()).n;
+  const pitches = (await one(`SELECT count(*) n FROM outbox_queue WHERE status = 'sent' AND sent_at >= ?`, since).catch(() => ({ n: 0 }))).n;
+  const pitchReplies = (await one(`SELECT count(*) n FROM events WHERE kind = 'general_mail' AND at >= ?`, since)).n;
+  const growth = await one(`SELECT detail FROM events WHERE kind = 'agent_growth' ORDER BY id DESC LIMIT 1`);
+  let growthNote = ''; try { growthNote = JSON.parse(growth?.detail || '{}').final || ''; } catch {}
   const sys = await systemsCheck(env);
   const promoUsd = Number(await kvGet(env, 'claude_usd_promo') || 0), paidUsd = Number(await kvGet(env, 'claude_usd_paid') || 0);
-  const sysLine = ['prodigi', 'stripe', 'claude'].map((k) => `${k} ${sys[k].ok ? 'OK' : 'FAILING: ' + sys[k].error}`).join(' · ') + ` · etsy ${sys.etsy?.connected ? 'connected' : 'not connected'}`;
-  const total = orders.results.reduce((a, r) => a + (r.p || 0), 0);
-  const count = orders.results.reduce((a, r) => a + r.n, 0);
-  const text = `House Almanac: last 7 days
+  const failing = ['prodigi', 'stripe', 'claude'].filter(k => !sys[k]?.ok);
+  const needs = [
+    ...failing.map(k => `${k} is failing: ${sys[k].error}`),
+    ...attention.map(a => `order ${a.id} needs attention: ${a.notes || ''}`),
+    ...(PREPAID_USD - paidUsd < 8 && new Date().toISOString().slice(0, 10) >= '2026-11-20' ? [`Claude credit: about $${Math.max(0, PREPAID_USD - paidUsd).toFixed(0)} left; a top-up needs your yes`] : []),
+  ];
+  const gbp = (p) => `£${(p / 100).toFixed(0)}`;
+  const text = `Hi Reece,
 
-Orders: ${count} (£${(total / 100).toFixed(2)})
-${orders.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}
+Here's the week at House Almanac.
 
-Gift vouchers: ${vouchers.n} sold (£${(vouchers.p / 100).toFixed(2)}), ${redeemed} redeemed
+Sales: ${paid.n} paid order${paid.n === 1 ? '' : 's'} (${gbp(paid.p)})${vouchers.n ? ` and ${vouchers.n} gift voucher${vouchers.n === 1 ? '' : 's'} (${gbp(vouchers.p)})` : ''}. All time: ${paidAll.n} (${gbp(paidAll.p)}).
+Prints sent to the printer: ${printed.reduce((a, r) => a + r.n, 0)} (about £${printCost.toFixed(0)}).
 
-Estate agents (outreach emails this week: ${sentWeek}; office prints made: ${previews}; free framed samples used ${samples.used} of ${samples.cap}):
-${prospects.results.map(r => `- ${r.status}: ${r.n}`).join('\n') || '- none'}
+Estate agents: ${newAgencies} new agencies emailed and ${followUps} follow-ups this week; ${total} contacted in total.
+Replies this week: ${replies.map(r => `${r.n} ${String(r.intent || 'other').replace(/_/g, ' ')}`).join(', ') || 'none'}.
+Interested so far: ${st.interested || 0}. Free framed samples sent: ${samples.used} of ${samples.cap}. Paying agencies: ${samples.paying}.
 
-Systems: ${sysLine}
-Claude API (estimate): $${promoUsd.toFixed(2)} on free credit, $${paidUsd.toFixed(2)} of $${PREPAID_USD} prepaid used
+Press, gift guides and partners: ${pitches} pitches sent this week, ${pitchReplies} repl${pitchReplies === 1 ? 'y' : 'ies'}.
 
-Needs attention: ${attention.results.length ? '\n' + attention.results.map(a => `- ${a.id} ${a.address}: ${a.notes || ''}`).join('\n') : 'nothing'}
+${growthNote ? `Plan for this week:\n${growthNote.replace(/\*\*/g, '').slice(0, 1200)}\n\n` : ''}Running costs: Claude API about $${(promoUsd + paidUsd).toFixed(0)} used ($${promoUsd.toFixed(0)} of the free $100 until 24 Nov, then $${paidUsd.toFixed(0)} of $${PREPAID_USD} prepaid).
 
-(Automatic weekly summary. No action needed unless something is listed above.)`;
-  await sendMail(env, { to: BRAND.from, bcc: false, subject: `House Almanac weekly summary${sys.ok ? '' : ' (ACTION NEEDED: a service is failing)'}`, text });
+${needs.length ? `Needs you:\n${needs.map(n => `- ${n}`).join('\n')}` : 'Nothing needs you this week.'}
+
+Claude
+(running House Almanac for you)`;
+  if (dry) return { subject: `House Almanac weekly update${needs.length ? ' (needs you)' : ''}`, text };
+  await sendMail(env, { to: BRAND.from, bcc: false, subject: `House Almanac weekly update${needs.length ? ' (needs you)' : ''}`, text });
 }

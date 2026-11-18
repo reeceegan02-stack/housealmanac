@@ -135,7 +135,7 @@ async function admin(req, env, url) {
   if (p === '/prospects') return json((await env.DB.prepare('SELECT * FROM prospects ORDER BY agency').all()).results);
   if (p === '/events') return json((await env.DB.prepare('SELECT * FROM events ORDER BY id DESC LIMIT ?').bind(Number(url.searchParams.get('limit') || 50)).all()).results);
   if (p === '/send' && req.method === 'POST') return json(await sendMail(env, body));
-  if (p === '/summary' && req.method === 'POST') { await weeklySummary(env); return json({ ok: true }); }
+  if (p === '/summary' && req.method === 'POST') { const r = await weeklySummary(env, { dry: !!body.dry }); return json(r || { ok: true }); }
   if (p === '/etsy/poll' && req.method === 'POST') return json(await pollEtsy(env));
   if (p === '/stripe/reconcile' && req.method === 'POST') return json(await reconcileStripe(env));
   if (p === '/check') return json(await systemsCheck(env));

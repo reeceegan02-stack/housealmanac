@@ -1,6 +1,7 @@
-// Handles mail to hello@housealmanac.co.uk: keeps a copy in Gmail, then answers or acts on it.
+// Handles mail to hello@housealmanac.co.uk: archives it, then answers or acts on it. Reece's Gmail only gets mail meant
+// for him (the weekly update, ACTION NEEDED and decision emails), plus anything the handler fails on.
 import PostalMime from 'postal-mime';
-import { BRAND, ensureSchema, getOrder, updateOrder, logEvent, extractJson, now, fileUrl, kvGet, kvSet } from './util.js';
+import { BRAND, ensureSchema, getOrder, updateOrder, logEvent, extractJson, now, fileUrl, kvGet, kvSet, randomKey } from './util.js';
 import { claude, MODELS, parseJson } from './claude.js';
 import { KB } from './kb.js';
 import { sendMail, approvedEmail, firstName } from './mail.js';
@@ -15,22 +16,40 @@ const IGNORE_FROM = /(no-?reply|do-?not-?reply|mailer-daemon|postmaster|notifica
 export async function handleInbound(message, env, ctx) {
   await ensureSchema(env);
   const raw = await new Response(message.raw).arrayBuffer();
-  // Keep Reece's copy of everything.
   let forwarded = false;
-  if (env.FORWARD_TO) {
+  const forward = async () => {
+    if (!env.FORWARD_TO || forwarded) return;
     try { await message.forward(env.FORWARD_TO); forwarded = true; } catch (e) { console.error('forward failed', e); }
-  }
-  const mail = await PostalMime.parse(raw);
+  };
+  let mail;
+  try { mail = await PostalMime.parse(raw); } catch (e) { await forward(); throw e; }
   const from = (mail.from?.address || message.from || '').toLowerCase();
   const subject = mail.subject || '';
-  const body = stripQuoted(mail.text || htmlToText(mail.html || '')).slice(0, 6000);
-  const autoSubmitted = (message.headers.get('auto-submitted') || '').toLowerCase();
-  const precedence = (message.headers.get('precedence') || '').toLowerCase();
 
-  if (from === BRAND.from || from.endsWith('@housealmanac.co.uk')) { // our own copies
+  if (from === BRAND.from || from.endsWith('@housealmanac.co.uk')) {
+    // Our own mail. Addressed to hello@ = meant for Reece (weekly update, ACTION NEEDED, decisions): forward it.
+    // Anything else is the BCC copy of an email to a customer or agent: just log it.
+    const toUs = (mail.to || []).some(a => String(a.address || '').toLowerCase() === BRAND.from);
+    if (toUs) await forward();
     await logEvent(env, null, 'inbox_own', { subject, forwarded });
     return;
   }
+  // Everyone else's mail is kept for 180 days (it no longer goes to Gmail) and then handled.
+  try { await env.FILES.put(`mail-${now().slice(0, 10)}-${randomKey(8)}.eml`, raw, { expirationTtl: 180 * 86400, metadata: { from, subject: subject.slice(0, 200) } }); } catch (e) { console.error('archive failed', e); }
+  try {
+    return await handleExternal(env, message, mail, from, subject, forward, () => forwarded);
+  } catch (e) {
+    await forward(); // if the handler breaks, Reece gets the original so nothing is lost
+    await alert(env, `an email from ${from} couldn't be handled automatically`, `Subject: ${subject}\nError: ${e.message}\n\nThe original has been forwarded to you.`).catch(() => {});
+    throw e;
+  }
+}
+
+async function handleExternal(env, message, mail, from, subject, forward, wasForwarded) {
+  const forwarded = wasForwarded();
+  const body = stripQuoted(mail.text || htmlToText(mail.html || '')).slice(0, 6000);
+  const autoSubmitted = (message.headers.get('auto-submitted') || '').toLowerCase();
+  const precedence = (message.headers.get('precedence') || '').toLowerCase();
   if (/mailer-daemon|postmaster/i.test(from) || /undeliver|delivery status notification|returned mail|delivery failure/i.test(subject)) {
     await handleBounce(env, (mail.text || htmlToText(mail.html || '')).toLowerCase(), subject);
     return;

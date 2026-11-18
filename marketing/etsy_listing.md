@@ -15,7 +15,7 @@ Personalised House History Print, Old Map of Your Street Then and Now, New Home 
 Free UK delivery on both. Quantity: 99.
 
 **Personalisation (required)** — instructions shown to buyer:
-"Please give: 1) the full address and postcode, 2) the year you moved in (or 'gift'), 3) a short message for the bottom of the print, up to 120 characters, and who it's from. We email a proof before printing."
+"Please give: 1) the full address and postcode, 2) the year you moved in (or 'gift'), 3) a short message for the bottom of the print, up to 120 characters, and who it's from. We email a proof before printing; if we haven't heard back within 2 days, we print it as shown so it arrives on time."
 Character limit: 400.
 
 **Processing time:** 3–5 working days (proof within 2 working days, then 2–3 days to print). Delivery 1–3 days.
@@ -62,7 +62,7 @@ THE DETAILS
 
 GOOD TO KNOW
 • Historic maps are reproduced with permission from the National Library of Scotland (CC-BY).
-• We use AI tools to help gather and draft the research. Every print is checked and you see a proof before anything is printed.
+• Research is drafted with the help of digital tools, including AI (Etsy asks sellers to say so), and every fact comes from a named source.
 • Personalised, so it can't be returned once you've approved the proof. If anything arrives damaged, we'll replace it free.
 • Printed and framed for us by our UK production partner.
 

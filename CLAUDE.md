@@ -47,7 +47,13 @@ Gift vouchers (9 Nov): framed £89 https://buy.stripe.com/28EcN74IxdtKebS2GD2wU0
   Attachments must reach the Email Service as bytes (Uint8Array): base64 strings were sent as text, so attachments up to 10 Nov 10:30 UTC
   didn't open. sendMail converts strings; prints are also shown in the email body (inlineImage) with a view-online link. The old `housealmanac-mail`
   worker is no longer used.
-  Replies arrive at hello@ → ops worker (acts on them) → copy in reeceegan02@gmail.com; read in Chrome Gmail (`to:hello@housealmanac.co.uk`) only if needed.
+  Replies arrive at hello@ → ops worker (acts on them). Since 18 Nov (Reece's wish) only mail meant for Reece is forwarded to his Gmail:
+  our own emails addressed To hello@ (weekly update, ACTION NEEDED, Decision, agent emails to him) and any email the handler fails on.
+  Everything external is archived in KV FILES as mail-<date>-<rand>.eml for 180 days; BCC copies of outgoing mail are logged only.
+  HTML emails get a designed signature (mail.js signatureHtml, logo site/email-mark.png) from the "Best wishes,\nReece…" sign-off.
+- **No AI mentions** (Reece, 18 Nov): not on the website, emails or pitches. Exceptions: the Etsy listing keeps a one-line disclosure
+  (Etsy requires it), the privacy policy lists "research and drafting software" as a processor category, and if anyone sincerely asks,
+  the inbox answers honestly (kb.js) — never deny it.
 - Etsy shop: HouseAlmanac (Reece's Etsy account, signed in in Chrome). Listing copy in `marketing/etsy_listing.md`.
 
 ## Automation (runs 24/7 in Cloudflare, no laptop needed)
@@ -64,7 +70,7 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **Agent growth engine** (`ops/src/outreach.js`, Workflow `housealmanac-outreach`): weekdays 10:00 UTC the cron starts the day's run:
   Claude web search finds estate agents area by area (AREAS: Greater Manchester first, then North West, Yorkshire, UK) → only Ltd/LLP with a
   published email verified on their own website (PECR) → follow-ups for anyone due → for each new agency (10/day week one, then 20/day,
-  4 minutes apart) an **office preview**: an agent-preview order for their own office address goes through the normal pipeline (6 web searches)
+  4 minutes apart) an **office preview**: an agent-preview order for their own office address goes through the normal pipeline (4 web searches)
   and the first email ("The history of <street>, for <agency>") carries that print as a JPG (Reece's idea, 9 Nov). No office address or failed
   check → plain intro email. Follow-up after 7 days. Reply "yes" → framed office print (free while samples last, else £75 link). Buyer prints:
   free digital proof → £75. Bounces → 'bounced'. Pause: var OUTREACH_PAUSED=true. ~25p AI cost per agency.
@@ -87,7 +93,7 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
   flow. Cancel before approval → voucher reactivated. Inbox: buyers can get their code resent; unused vouchers within 14 days are refunded
   automatically (Stripe refund), anything else escalates. Admin: GET /admin/vouchers, POST /admin/voucher/test {email, product, recipient}.
 - **Cron every 30 min**: Prodigi tracking → "on its way" email; retry stuck orders (3 tries then alert); Stripe reconciliation (paid sessions
-  with no order get created, and hello@ is warned the webhook missed them); Monday weekly summary to hello@.
+  with no order get created, and hello@ is warned the webhook missed them); Monday 09:00 UTC weekly update to Reece (after the growth agent, includes its plan; POST /admin/summary {dry:true} previews it).
 - **Admin API** (header `x-admin-key` = Worker secret ADMIN_KEY; not stored anywhere — rotate it in Worker settings if you need access):
   GET /admin/orders · GET /admin/order/:id · POST /admin/order/:id/restart · POST /admin/order/:id/approve · POST /admin/test-order
   · GET|POST /admin/prospects · GET /admin/events · POST /admin/send · POST /admin/summary · POST /admin/order/:id/set (fields) · POST /admin/stripe/reconcile · POST /admin/etsy/poll
@@ -102,7 +108,8 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **Etsy**: CONNECTED 10 Nov 2026 (app "house-almanac-orders" approved, callback added, access allowed; /admin/check shows etsy.connected). Forwarding sale emails is no longer needed. The cron pings the API every 30 min; when the key goes
   live it emails hello@ the last two steps (add callback URL https://housealmanac-ops.reeceegan02.workers.dev/etsy/callback in the app, then
   Reece opens /etsy/connect and clicks Allow). Reece must paste ETSY_KEYSTRING + ETSY_SHARED_SECRET as Build secrets (never enter keys yourself).
-  Once connected: cron pulls paid receipts → workflow → prints straight after the AI check (no proof; Etsy API can't message buyers) → tracking to Etsy.
+  Once connected: cron pulls paid receipts → workflow → proof emailed if Etsy gives the buyer's email (printed automatically if no reply in 48 h,
+  as the listing says), otherwise printed straight after the automatic check → tracking to Etsy.
   Stopgap until then: Reece forwards Etsy's "You made a sale" email to hello@ and the inbox creates the order (external_ref etsy-<receipt>, so no duplicates later).
 
 ## Agents (monitoring, maintenance, growth) — nothing depends on Reece's laptop
@@ -112,7 +119,7 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **In-worker agents** (`ops/src/agent.js`, Workflow `housealmanac-agents`, Claude API with bounded tools; run in Cloudflare, no laptop):
   - Daily ops agent 07:00 UTC: reads the snapshot; can restart stuck orders, pause/resume outreach (kv agent_outreach_paused),
     and email Reece only when he must act (once per run).
-  - Weekly growth agent Mondays 09:00 UTC: can set outreach per-day (kv agent_outreach_per_day, 0-40) and queue up to 15 pitches
+  - Weekly growth agent Mondays 07:00 UTC: can set outreach per-day (kv agent_outreach_per_day, 0-40) and queue up to 15 pitches
     (press, gift guides, bloggers, partners) into D1 `outbox_queue` (with source URL); `ops/src/outbox.js` sends them weekdays 9-17 UK,
     max OUTBOX_PER_DAY, never twice to one address, honouring opt-outs. Their notes appear in the snapshot (`agents`).
   - Admin: POST /admin/agent/run {agent: ops|growth}, GET /admin/outbox.
@@ -128,5 +135,5 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - `ops/` cloud operations worker · `site/` website · `pipeline/` print templates and render scripts · `marketing/` mockups, Etsy listing, ad copy · `business/` pricing model, ledger, prospects.
 
 ## Budget tracker (£2,000 all-in, from 9 Nov 2026)
-Spent to 9 Nov: £42.08 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60). Committed: free framed samples up to 5 × £51.30; Etsy Ads up to ~£65 (Reece said yes 9 Nov: £4/day, 24 Nov–9 Dec, Etsy's new-shop wait ends 24 Nov; scheduled reminders switch it on 24 Nov and off 9 Dec).
+Spent to 18 Nov: £93.38 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency sample 1 £51.30). Committed: 4 more free framed samples × £51.30; Etsy Ads up to ~£65 (Reece said yes 9 Nov: £4/day, 24 Nov–9 Dec, Etsy's new-shop wait ends 24 Nov; scheduled reminders switch it on 24 Nov and off 9 Dec).
 Keep this line current; the weekly growth agent recomputes it from business/ledger.csv.

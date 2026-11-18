@@ -28,9 +28,39 @@ export async function sendMail(env, { to, subject, text, html, attachments, inli
   return res;
 }
 
+const paraHtml = (p, style = 'margin:0 0 14px') => `<p style="${style}">${esc(p).replace(/\n/g, '<br>').replace(/(https?:\/\/[^\s<]+?)([).,;:!?]*)(?=\s|<|$)/g, '<a href="$1" style="color:#9c3f2a">$1</a>$2')}</p>`;
+
+// The sign-off in every template ("Best wishes,\nReece\nHouse Almanac · ...") becomes a designed signature in the
+// HTML part; the plain-text part keeps the simple version. Anything after it (e.g. the opt-out line) is set small.
+const SIG_RE = /\n\n((?:Best wishes|Kind regards|Many thanks|Thanks|Best|Cheers|Warm regards|Regards),?)[ \t]*\n(Reece[^\n]*)((?:\n(?:House Almanac|hello@|(?:https?:\/\/)?(?:www\.)?housealmanac\.co\.uk)[^\n]*)*)(?=\n\n|\s*$)/i;
+
+export function signatureHtml(signoff = 'Best wishes,', nameLine = 'Reece', when = new Date()) {
+  const name = nameLine.replace(/[,|].*$/, '').trim() || 'Reece';
+  const xmas = when < new Date('2026-12-25T00:00:00Z')
+    ? `<div style="margin-top:6px;font:12px/1.4 Arial,Helvetica,sans-serif;color:#9c3f2a">${when < new Date('2026-12-10T00:00:00Z') ? 'Christmas: order by 9 December, or ' : 'Too late for Christmas delivery? '}<a href="https://housealmanac.co.uk/gift" style="color:#9c3f2a">give a gift voucher</a></div>` : '';
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 10px;border-collapse:collapse">
+<tr><td style="padding:0 0 14px;font:15px/1.55 Arial,Helvetica,sans-serif;color:#2a241e">${esc(signoff)}<br>${esc(name)}</td></tr>
+<tr><td style="border-top:2px solid #9c3f2a;padding:14px 0 0">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse"><tr>
+<td style="padding:0 14px 0 0;vertical-align:top"><a href="https://housealmanac.co.uk"><img src="https://housealmanac.co.uk/email-mark.png" width="48" height="48" alt="House Almanac" style="display:block;border:0;border-radius:9px"></a></td>
+<td style="vertical-align:top;font:13px/1.5 Arial,Helvetica,sans-serif;color:#62584c">
+<div style="font:bold 16px/1.3 Georgia,'Times New Roman',serif;color:#2a241e">House Almanac</div>
+<div style="font:italic 13px/1.4 Georgia,'Times New Roman',serif;color:#62584c;margin-bottom:3px">The story of your home, framed.</div>
+<div><a href="https://housealmanac.co.uk" style="color:#2a241e;text-decoration:none">housealmanac.co.uk</a> &nbsp;·&nbsp; <a href="mailto:hello@housealmanac.co.uk" style="color:#2a241e;text-decoration:none">hello@housealmanac.co.uk</a> &nbsp;·&nbsp; Manchester</div>
+${xmas}</td></tr></table></td></tr></table>`;
+}
+
 export function textToHtml(text) {
-  const paras = String(text).split(/\n{2,}/).map(p => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, '<br>').replace(/(https?:\/\/[^\s<]+?)([).,;:!?]*)(?=\s|<|$)/g, '<a href="$1" style="color:#9c3f2a">$1</a>$2')}</p>`);
-  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#2a241e;max-width:600px">${paras.join('')}</div>`;
+  let t = String(text), sig = '', after = '';
+  const m = t.match(SIG_RE);
+  if (m) {
+    sig = signatureHtml(m[1], m[2]);
+    after = t.slice(m.index + m[0].length).trim();
+    t = t.slice(0, m.index);
+  }
+  const paras = t.split(/\n{2,}/).filter(p => p.trim()).map(p => paraHtml(p));
+  const tail = after ? after.split(/\n{2,}/).map(p => paraHtml(p, 'margin:10px 0 0;font-size:12px;color:#8a8073')).join('') : '';
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#2a241e;max-width:600px">${paras.join('')}${sig}${tail}</div>`;
 }
 
 export const jpegAttachment = (bytes, filename) => ({ content: bytes, filename, type: 'image/jpeg', disposition: 'attachment' });
@@ -74,7 +104,7 @@ ${order.source === 'partner-proof'
   ? `If you're happy with it, just reply "yes" and we'll frame it for your branch. If you'd like anything else changed, reply and tell us what.`
   : order.source === 'agent-proof'
   ? `If it's right and you'd like it printed and framed for your buyer (£75, delivered to your branch), just reply "approved" and we'll send you the payment link. If you'd like changes, reply and tell us what to change.`
-  : `If it's right, just reply "approved" and we'll print and dispatch it${order.source === 'agent-sample' ? ' to your branch' : ''}. If you'd like changes, reply and tell us what to change.`}${order.source && order.source.startsWith('agent-') ? `
+  : `If it's right, just reply "approved" and we'll print and dispatch it${order.source === 'agent-sample' ? ' to your branch' : ''}. If you'd like changes, reply and tell us what to change.${order.source === 'etsy' ? ` If we don't hear from you within 2 days, we'll print it as shown so it reaches you in good time.` : ''}`}${order.source && order.source.startsWith('agent-') ? `
 
 Tip: reply with your logo attached and a link to your Google reviews page, and we'll add them to the print with a QR code.` : ''}
 

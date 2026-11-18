@@ -88,6 +88,8 @@ export function frameMap({ lat, lon, lines, boxW, boxH, devicePx, maxZoom, minSp
 // HTML for a tile mosaic covering a box. urlFor(z,x,y) -> src.
 // A tile that fails (e.g. at a county-sheet boundary) tries the alternative layers in turn, then hides.
 // Alternatives may be a parent tile at a lower zoom, shown cropped to the right quarter via "#vb=<object-view-box>".
+// Shorten long AI-written source lists at a word boundary so the footer credits always fit.
+const clip = (t, n) => { t = String(t || '').trim(); return t.length <= n ? t : t.slice(0, t.lastIndexOf(' ', n)).replace(/[,;:]$/, '') + '…'; };
 const TILE_ONERROR = "var a=(this.dataset.alts||'').split('|').filter(Boolean);if(a.length){var n=a[0].split('#vb=');this.dataset.alts=a.slice(1).join('|');this.style.objectViewBox=n[1]||'';this.src=n[0];}else{this.onerror=null;this.style.visibility='hidden';}";
 
 // Fallbacks for one historic tile: the same tile from the other county layers, then the matching part of
@@ -241,7 +243,7 @@ export function composeHtml({ data, geo, lines, histLayer, histAlts = [], todayT
   const cols = Math.max(6, data.timeline.length);
   const msg = esc(message || '').replace(/\n+/g, '<br>');
   const story = data.story.map(p => `<p class="body">${esc(p)}</p>`).join('');
-  const sources = `Historic map: Ordnance Survey 25-inch, c.1890–1914, reproduced with the permission of the National Library of Scotland (CC-BY). Today's map: © OpenStreetMap contributors (ODbL). Sales: HM Land Registry Price Paid Data (OGL). ${esc(data.sources)}`;
+  const sources = `Historic map: Ordnance Survey 25-inch, c.1890–1914, reproduced with the permission of the National Library of Scotland (CC-BY). Today's map: © OpenStreetMap contributors (ODbL). Sales: HM Land Registry Price Paid Data (OGL). ${esc(clip(data.sources, 420))}`;
 
   return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><title>House Almanac — ${esc(data.title)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Lora:ital,wght@0,700;1,400;1,500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=block" rel="stylesheet">
@@ -313,7 +315,7 @@ p.body:first-of-type::first-letter{font-family:'Lora',serif;font-weight:700;floa
 </div>
 
 <div class="abs hair" style="left:16mm;right:16mm;top:406mm"></div>
-<div class="abs src" id="src" style="left:16mm;top:407.5mm;width:265mm;max-height:10mm;overflow:hidden">${sources}</div>
+<div class="abs src" id="src" style="left:16mm;top:407.5mm;width:265mm;height:10mm;overflow:hidden"><div class="srcin">${sources}</div></div>
 
 <script>
 // Shrink text that doesn't fit its box.
@@ -325,7 +327,7 @@ window.__fit = function(){
   r.story = fit(document.getElementById('story'), 'p.body', 0.78);
   r.tl = fit(document.getElementById('tl'), '.what', 0.75);
   const box = document.querySelector('.msgbox'); const m = document.getElementById('msg'); let ms = 13; while (box.scrollHeight > box.clientHeight + 1 && ms > 8) { ms -= 0.5; m.style.fontSize = ms + 'pt'; } r.msg = ms;
-  r.src = fit(document.getElementById('src'), null, 0.7);
+  r.src = fit(document.getElementById('src'), '.srcin', 0.55); // shrink the text, not the box (the footer was being cut off)
   return r;
 };
 </script>
