@@ -14,11 +14,12 @@ import { kvGet, kvSet } from './util.js';
 import { startDailyOutreach, samplesStatus } from './outreach.js';
 import { voucherSafetyNet } from './voucher.js';
 import { adsSummary } from './ads.js';
+import { setLinkRedirects } from './stripe.js';
 
 export async function runScheduled(event, env) {
   await ensureSchema(env);
   const d = new Date(event.scheduledTime || Date.now());
-  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env), voucherSafetyNet(env), sampleFollowUp(env)];
+  const jobs = [checkShipping(env), retryStuck(env), pollEtsy(env), reconcileStripe(env), creditWatch(env), etsyApprovalWatch(env), sendOutbox(env), voucherSafetyNet(env), sampleFollowUp(env), stripeRedirectsOnce(env)];
   if (d.getUTCHours() === 10 && d.getUTCMinutes() < 30) jobs.push(startDailyOutreach(env, d));
   if (d.getUTCDay() === 1 && d.getUTCHours() === 9 && d.getUTCMinutes() < 30) jobs.push(weeklySummary(env)); // after the growth agent, so its plan is included
   if (d.getUTCHours() === 7 && d.getUTCMinutes() < 30) jobs.push(startAgent(env, 'ops', d.toISOString().slice(0, 10)));
@@ -26,6 +27,19 @@ export async function runScheduled(event, env) {
   const results = await Promise.allSettled(jobs);
   for (const r of results) if (r.status === 'rejected') await logEvent(env, null, 'cron_error', String(r.reason?.message || r.reason));
   try { await buildStatus(env); } catch (e) { await logEvent(env, null, 'cron_error', 'status: ' + e.message); }
+}
+
+// Once: send paying customers to /thanks after Stripe checkout (Google Ads conversion). Retries every 6 hours
+// until it works; the result is in the status snapshot (controls.stripe_redirects).
+async function stripeRedirectsOnce(env) {
+  if ((await kvGet(env, 'stripe_redirects_ok')) === 'true') return;
+  const last = Number(await kvGet(env, 'stripe_redirects_tried') || 0);
+  if (Date.now() - last < 6 * 3600e3) return;
+  await kvSet(env, 'stripe_redirects_tried', String(Date.now()));
+  const r = await setLinkRedirects(env);
+  await kvSet(env, 'stripe_redirects_result', JSON.stringify(r).slice(0, 1500));
+  if (r.ok) await kvSet(env, 'stripe_redirects_ok', 'true');
+  await logEvent(env, null, r.ok ? 'stripe_redirects_set' : 'stripe_redirects_error', r);
 }
 
 async function checkShipping(env) {

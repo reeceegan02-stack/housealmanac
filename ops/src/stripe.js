@@ -68,3 +68,24 @@ export function sessionToOrder(s) {
     ship_json: JSON.stringify(ship),
   };
 }
+
+// Point the consumer payment links at housealmanac.co.uk/thanks, which fires the Google Ads purchase conversion.
+const THANKS_LINKS = { 'https://buy.stripe.com/4gM14p7UJfBSffW9512wU00': 'framed', 'https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01': 'unframed',
+  'https://buy.stripe.com/28EcN74IxdtKebS2GD2wU03': 'voucher-framed', 'https://buy.stripe.com/6oUdRb0shfBSffW1Cz2wU04': 'voucher-unframed' };
+const hideKey = (m) => String(m).replace(/[rs]k_\w+/g, '[key]');
+export async function setLinkRedirects(env, { dry = false } = {}) {
+  let links;
+  try { links = await stripeGet(env, '/payment_links?limit=50'); } catch (e) { return { ok: false, error: hideKey(e.message) }; }
+  const out = [];
+  for (const l of links.data || []) {
+    const kind = THANKS_LINKS[l.url];
+    if (!kind) continue;
+    const target = `https://housealmanac.co.uk/thanks?p=${kind}&sid={CHECKOUT_SESSION_ID}`;
+    if (dry || (l.after_completion?.type === 'redirect' && l.after_completion.redirect?.url === target)) { out.push({ kind, type: l.after_completion?.type, done: l.after_completion?.redirect?.url === target }); continue; }
+    try {
+      const r = await stripePost(env, `/payment_links/${l.id}`, { 'after_completion[type]': 'redirect', 'after_completion[redirect][url]': target });
+      out.push({ kind, type: r.after_completion?.type, done: r.after_completion?.redirect?.url === target });
+    } catch (e) { out.push({ kind, error: hideKey(e.message).slice(0, 200) }); }
+  }
+  return { ok: out.length === 4 && out.every(x => x.done), links: out };
+}

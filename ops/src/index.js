@@ -15,7 +15,7 @@ import { createPrintOrder } from './prodigi.js';
 import { etsyConnect, etsyCallback, pollEtsy } from './etsy.js';
 import { VoucherWorkflow, redeemVoucher } from './voucher.js';
 import { adsScript, adsReport, adsCommands, adsAdminCommand, adsSummary } from './ads.js';
-import { stripePost } from './stripe.js';
+import { setLinkRedirects } from './stripe.js';
 
 export { OrderWorkflow, OutreachWorkflow, AgentWorkflow, VoucherWorkflow };
 
@@ -174,25 +174,7 @@ async function admin(req, env, url) {
   }
   if (p === '/ads') return json({ summary: await adsSummary(env), report: JSON.parse(await kvGet(env, 'ads_report') || 'null') });
   if (p === '/ads/command' && req.method === 'POST') return json(await adsAdminCommand(env, body));
-  if (p === '/stripe/link-redirects' && req.method === 'POST') {
-    // Point the consumer payment links at /thanks (fires the Google Ads purchase conversion). dry:true only lists them.
-    const want = { 'https://buy.stripe.com/4gM14p7UJfBSffW9512wU00': 'framed', 'https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01': 'unframed',
-      'https://buy.stripe.com/28EcN74IxdtKebS2GD2wU03': 'voucher-framed', 'https://buy.stripe.com/6oUdRb0shfBSffW1Cz2wU04': 'voucher-unframed' };
-    let links;
-    try { links = await stripeGet(env, '/payment_links?limit=50'); } catch (e) { return json({ error: e.message.replace(/rk_\w+/g, '[key]') }, 502); }
-    const out = [];
-    for (const l of links.data || []) {
-      const kind = want[l.url];
-      if (!kind) continue;
-      const target = `https://housealmanac.co.uk/thanks?p=${kind}&sid={CHECKOUT_SESSION_ID}`;
-      if (body.dry) { out.push({ id: l.id, kind, after_completion: l.after_completion }); continue; }
-      try {
-        const r = await stripePost(env, `/payment_links/${l.id}`, { 'after_completion[type]': 'redirect', 'after_completion[redirect][url]': target });
-        out.push({ id: l.id, kind, after_completion: r.after_completion });
-      } catch (e) { out.push({ id: l.id, kind, error: e.message.replace(/rk_\w+/g, '[key]') }); }
-    }
-    return json(out);
-  }
+  if (p === '/stripe/link-redirects' && req.method === 'POST') return json(await setLinkRedirects(env, { dry: !!body.dry }));
   if (p === '/vouchers') return json((await env.DB.prepare('SELECT * FROM vouchers ORDER BY created_at DESC LIMIT 100').all()).results);
   if (p === '/voucher/test' && req.method === 'POST') {
     // A voucher without a Stripe payment (session_id 'test-...'), to check the PDF, the email and redemption.

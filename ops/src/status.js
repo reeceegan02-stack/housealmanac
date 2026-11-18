@@ -52,7 +52,7 @@ export async function buildStatus(env) {
     agents: (await q(`SELECT at, kind, detail FROM events WHERE kind IN ('agent_ops','agent_growth') ORDER BY id DESC LIMIT 6`))
       .map(e => { let d = {}; try { d = JSON.parse(e.detail); } catch {} return { at: e.at, agent: e.kind, note: scrub(d.final, 400), actions: (d.actions || []).map(a => a.tool) }; }),
     vouchers: await q(`SELECT product, status, count(*) n FROM vouchers WHERE session_id NOT LIKE 'test-%' GROUP BY product, status`).catch(() => []),
-    controls: { outreach_paused_by_agent: (await kvGet(env, 'agent_outreach_paused')) === 'true', outreach_per_day_override: await kvGet(env, 'agent_outreach_per_day') },
+    controls: { stripe_redirects: JSON.parse(await kvGet(env, 'stripe_redirects_result') || 'null'), outreach_paused_by_agent: (await kvGet(env, 'agent_outreach_paused')) === 'true', outreach_per_day_override: await kvGet(env, 'agent_outreach_per_day') },
     google_ads: await adsSummary(env).catch(e => ({ error: e.message })),
     claude_usd: { promo: Number(await kvGet(env, 'claude_usd_promo') || 0).toFixed(2), paid: Number(await kvGet(env, 'claude_usd_paid') || 0).toFixed(2) },
   };
