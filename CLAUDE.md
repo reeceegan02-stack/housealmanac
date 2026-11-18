@@ -58,6 +58,9 @@ Gift vouchers (9 Nov): framed £89 https://buy.stripe.com/28EcN74IxdtKebS2GD2wU0
   the original plus copies angled at first home, housewarming, Christmas gift for parents, then-and-now map art, and leaving home
   (same product, variations and photos; different titles, tags and first line). New listings cost $0.20 each (needs Reece's yes).
   Reece's Meta ad accounts keep getting banned, so no Meta ads.
+- Google Ads: account 498-155-5331 created 18 Nov (Reece asked me to set it up in Chrome) under his Google login, payments profile
+  "reece egan-sheath" (Individual, UK), GBP. Waiting on Reece to update the expired card (Mastercard ••0885) and submit billing.
+  Plan, keywords and ads: marketing/google_ads.md. Never link the BICS (NW) Business Profile Google offers (his client's).
 
 ## Automation (runs 24/7 in Cloudflare, no laptop needed)
 Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `main` via Workers Builds, root `/ops`).
