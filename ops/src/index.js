@@ -52,7 +52,7 @@ export default {
 
       if (p.startsWith('/admin/')) {
         if (!env.ADMIN_KEY || req.headers.get('x-admin-key') !== env.ADMIN_KEY) return json({ error: 'forbidden' }, 403);
-        return admin(req, env, url);
+        return await admin(req, env, url);
       }
       return json({ error: 'not found' }, 404);
     } catch (e) {
@@ -178,15 +178,18 @@ async function admin(req, env, url) {
     // Point the consumer payment links at /thanks (fires the Google Ads purchase conversion). dry:true only lists them.
     const want = { 'https://buy.stripe.com/4gM14p7UJfBSffW9512wU00': 'framed', 'https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01': 'unframed',
       'https://buy.stripe.com/28EcN74IxdtKebS2GD2wU03': 'voucher-framed', 'https://buy.stripe.com/6oUdRb0shfBSffW1Cz2wU04': 'voucher-unframed' };
-    const links = await stripeGet(env, '/payment_links?limit=50');
+    let links;
+    try { links = await stripeGet(env, '/payment_links?limit=50'); } catch (e) { return json({ error: e.message.replace(/rk_\w+/g, '[key]') }, 502); }
     const out = [];
     for (const l of links.data || []) {
       const kind = want[l.url];
       if (!kind) continue;
       const target = `https://housealmanac.co.uk/thanks?p=${kind}&sid={CHECKOUT_SESSION_ID}`;
       if (body.dry) { out.push({ id: l.id, kind, after_completion: l.after_completion }); continue; }
-      const r = await stripePost(env, `/payment_links/${l.id}`, { 'after_completion[type]': 'redirect', 'after_completion[redirect][url]': target });
-      out.push({ id: l.id, kind, after_completion: r.after_completion });
+      try {
+        const r = await stripePost(env, `/payment_links/${l.id}`, { 'after_completion[type]': 'redirect', 'after_completion[redirect][url]': target });
+        out.push({ id: l.id, kind, after_completion: r.after_completion });
+      } catch (e) { out.push({ id: l.id, kind, error: e.message.replace(/rk_\w+/g, '[key]') }); }
     }
     return json(out);
   }
