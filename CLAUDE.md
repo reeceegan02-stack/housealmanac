@@ -54,7 +54,10 @@ Gift vouchers (9 Nov): framed £89 https://buy.stripe.com/28EcN74IxdtKebS2GD2wU0
 - **No AI mentions** (Reece, 18 Nov): not on the website, emails or pitches. Exceptions: the Etsy listing keeps a one-line disclosure
   (Etsy requires it), the privacy policy lists "research and drafting software" as a processor category, and if anyone sincerely asks,
   the inbox answers honestly (kb.js) — never deny it.
-- Etsy shop: HouseAlmanac (Reece's Etsy account, signed in in Chrome). Listing copy in `marketing/etsy_listing.md`.
+- Etsy shop: HouseAlmanac (Reece's Etsy account, signed in in Chrome). Listing copy in `marketing/etsy_listing.md`. 6 active listings since 18 Nov:
+  the original plus copies angled at first home, housewarming, Christmas gift for parents, then-and-now map art, and leaving home
+  (same product, variations and photos; different titles, tags and first line). New listings cost $0.20 each (needs Reece's yes).
+  Reece's Meta ad accounts keep getting banned, so no Meta ads.
 
 ## Automation (runs 24/7 in Cloudflare, no laptop needed)
 Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `main` via Workers Builds, root `/ops`).
@@ -136,5 +139,5 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - `ops/` cloud operations worker · `site/` website · `pipeline/` print templates and render scripts · `marketing/` mockups, Etsy listing, ad copy · `business/` pricing model, ledger, prospects.
 
 ## Budget tracker (£2,000 all-in, from 9 Nov 2026)
-Spent to 18 Nov: £96.36 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency sample 1 £51.30, Etsy fees £2.98). Committed: 4 more free framed samples × £51.30; Etsy Ads up to ~£65 (Reece said yes 9 Nov: £4/day, 24 Nov–9 Dec, Etsy's new-shop wait ends 24 Nov; scheduled reminders switch it on 24 Nov and off 9 Dec).
+Spent to 18 Nov: £97.16 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency sample 1 £51.30, Etsy fees £2.98, 5 extra Etsy listings £0.80). Approved, not yet bought: Claude credit top-up $100 (~£95) when it's nearly used up (check scheduled 25 Nov). Committed: 4 more free framed samples × £51.30; Etsy Ads up to ~£65 (Reece said yes 9 Nov: £4/day, 24 Nov–9 Dec, Etsy's new-shop wait ends 24 Nov; scheduled reminders switch it on 24 Nov and off 9 Dec).
 Keep this line current; the weekly growth agent recomputes it from business/ledger.csv.

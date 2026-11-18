@@ -5,3 +5,4 @@ date,type,supplier,description,amount_gbp,notes
 2026-11-09,cost,Anthropic,Claude API prepaid credit ($20 + $4 VAT; one-off; powers street research),18.60,Charged as USD 24.00 on Visa ending 5781; GBP approximate - check against the card statement. Free $100 promo credit runs to 24 Nov
 2026-11-18,cost,Prodigi,Free framed office sample for an estate agency in Oldham - sample 1 of 5 (Prodigi ord_14799697; HA-4G1J2G),51.30,Price-list estimate (£32 + £10.75 delivery + VAT); check against the Prodigi invoice
 2026-11-18,cost,Etsy,Etsy fees to date (shop/listing; billed monthly on the 1st to Visa ending 5781),2.98,From Etsy payment account; check the 1 Dec bill
+2026-11-18,cost,Etsy,5 extra Etsy listings (5 x USD 0.20 listing fee; approved by Reece 18 Nov),0.80,USD 1.00; billed with Etsy fees on the 1st
