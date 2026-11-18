@@ -13,6 +13,7 @@ import { PREPAID_USD } from './claude.js';
 import { kvGet, kvSet } from './util.js';
 import { startDailyOutreach, samplesStatus } from './outreach.js';
 import { voucherSafetyNet } from './voucher.js';
+import { adsSummary } from './ads.js';
 
 export async function runScheduled(event, env) {
   await ensureSchema(env);
@@ -130,6 +131,7 @@ export async function weeklySummary(env, { dry = false } = {}) {
   const pitchReplies = (await one(`SELECT count(*) n FROM events WHERE kind = 'general_mail' AND at >= ? AND coalesce(json_extract(detail, '$.intent'), '') NOT IN ('supplier_or_sales_pitch', 'spam')`, since)).n;
   const growth = await one(`SELECT detail FROM events WHERE kind = 'agent_growth' ORDER BY id DESC LIMIT 1`);
   let growthNote = ''; try { growthNote = JSON.parse(growth?.detail || '{}').final || ''; } catch {}
+  const ads = await adsSummary(env).catch(() => ({ connected: false }));
   const sys = await systemsCheck(env);
   const promoUsd = Number(await kvGet(env, 'claude_usd_promo') || 0), paidUsd = Number(await kvGet(env, 'claude_usd_paid') || 0);
   const failing = ['prodigi', 'stripe', 'claude'].filter(k => !sys[k]?.ok);
@@ -151,6 +153,8 @@ Replies this week: ${replies.map(r => `${r.n} ${String(r.intent || 'other').repl
 Interested so far: ${st.interested || 0}. Free framed samples sent: ${samples.used} of ${samples.cap}. Paying agencies: ${samples.paying}.
 
 Press, gift guides and partners: ${pitches} pitches sent this week, ${pitchReplies} repl${pitchReplies === 1 ? 'y' : 'ies'}.
+
+Google Ads: ${ads.connected ? `£${ads.last_7d.spend.toFixed(2)} spent this week (${ads.last_7d.clicks} clicks, ${ads.last_7d.conversions} sales tracked); £${ads.total.spend.toFixed(2)} of the £${ads.cap_gbp} cap so far.` : 'monitor not reporting yet.'}
 
 ${growthNote ? `Plan for this week:\n${growthNote.replace(/\*\*/g, '').slice(0, 1200)}\n\n` : ''}Running costs: Claude API about $${(promoUsd + paidUsd).toFixed(0)} used ($${promoUsd.toFixed(0)} of the free $100 until 24 Nov, then $${paidUsd.toFixed(0)} of $${PREPAID_USD} prepaid).
 

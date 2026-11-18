@@ -8,7 +8,8 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 import { claude, MODELS, webSearchTool } from './claude.js';
 import { kvGet, kvSet, logEvent, ensureSchema, BRAND } from './util.js';
-import { buildStatus } from './status.js';
+import { buildStatus, scrub } from './status.js';
+import { queueNegatives, adsDetailForAgent, ADS_CAP_GBP } from './ads.js';
 import { sendMail } from './mail.js';
 import { startOrderWorkflow } from './orders.js';
 import { KB } from './kb.js';
@@ -41,6 +42,18 @@ const TOOLS = {
       if (Number.isFinite(per_day)) await kvSet(env, 'agent_outreach_per_day', String(Math.max(0, Math.min(40, per_day))));
       await logEvent(env, null, 'agent_outreach_set', { paused, per_day, reason: String(reason).slice(0, 200) });
       return `Outreach now paused=${await outreachPaused(env)}, per_day=${(await outreachPerDayOverride(env)) ?? 'default'}.`;
+    },
+  },
+  add_ads_negatives: {
+    def: { name: 'add_ads_negatives', description: 'Add negative keywords to the Google Ads search campaign (applied by the in-account script within the hour). Use for search terms that show no intent to buy a house print or gift. A guard rejects any negative that would block our own keywords. Max 10 per run.',
+      input_schema: { type: 'object', properties: { negatives: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, match: { type: 'string', enum: ['BROAD', 'PHRASE', 'EXACT'] } }, required: ['text', 'match'] } }, reason: { type: 'string' } }, required: ['negatives', 'reason'] } },
+    async run(env, { negatives, reason }, ctx) {
+      const room = 10 - (ctx.negs || 0);
+      if (room <= 0) return 'Limit of 10 negatives per run reached.';
+      const list = (negatives || []).slice(0, room);
+      ctx.negs = (ctx.negs || 0) + list.length;
+      const r = await queueNegatives(env, list, reason, 'ops-agent');
+      return `Queued: ${r.queued.join(', ') || 'none'}${r.rejected.length ? `. Rejected: ${r.rejected.join('; ')}` : ''}`;
     },
   },
   email_owner: {
@@ -101,6 +114,7 @@ ${KB}`;
 
 export async function opsAgent(env) {
   const status = await buildStatus(env);
+  const ads = await adsDetailForAgent(env, scrub).catch(() => null);
   return runAgent(env, {
     system: `You are the daily operations agent. ${RULES}`,
     prompt: `Today's status snapshot (JSON, privacy-scrubbed):
@@ -109,10 +123,14 @@ ${JSON.stringify(status).slice(0, 14000)}
 Review it and act:
 - Restart orders stuck over 3 hours or needing attention when a retry could plausibly help (map tiles, timeouts, transient API errors). Do not restart ones whose notes show a content problem a retry won't fix.
 - Outreach: if bounces exceed about 8% of emails sent in 7 days, or there are signs of complaints, pause outreach. If it is paused by you and the cause is gone, resume. Otherwise leave volume alone (the weekly growth agent sets volume).
+- Google Ads (status.google_ads; Search campaign, total budget capped at £${ADS_CAP_GBP} inside Google so it cannot overspend):
+  Search terms so far (private, not in the public snapshot): ${ads ? JSON.stringify(ads).slice(0, 9000) : 'no report yet'}
+  Add negatives (add_ads_negatives) only for search terms that clearly show no intent to buy a house-history print or a new-home/housewarming/Christmas gift: people after free or official records (deeds, Land Registry, planning, census), house prices or valuations, jobs or courses, other products (canvas, wallpaper, posters of famous maps), other brands or places to visit. Prefer one distinctive word as BROAD, or the exact term as EXACT. Never block terms about house history prints, old maps of a street, personalised house prints, or new-home/housewarming gifts. Skip terms already negative or pending.
+  If google_ads.stale is true for a second day, or ads are disapproved, or the campaign is not serving for a reason only Reece can fix (billing/payment, account suspended), email Reece once with the exact fix. Low clicks alone are not a reason to email.
 - Email Reece ONLY if he must do something himself (approve a card charge such as a Claude credit top-up when the prepaid $20 is nearly used, create an account, a system that keeps failing, or anything that needs a decision). Do not send routine summaries.
 Finish with a 1-3 line note of what you did.`,
-    tools: ['restart_order', 'set_outreach', 'email_owner'],
-    maxTurns: 8,
+    tools: ['restart_order', 'set_outreach', 'add_ads_negatives', 'email_owner'],
+    maxTurns: 10,
   });
 }
 

@@ -5,7 +5,7 @@ import { systemsCheck } from './check.js';
 import { cachedStatus, buildStatus } from './status.js';
 import { AgentWorkflow, startAgent } from './agent.js';
 import { OutreachWorkflow, startDailyOutreach, findProspects, samplesStatus, startPreview } from './outreach.js';
-import { ensureSchema, json, getOrder, logEvent, updateOrder, now, fileUrl } from './util.js';
+import { ensureSchema, json, getOrder, logEvent, updateOrder, now, fileUrl, kvGet } from './util.js';
 import { verifyStripe, stripeGet, sessionToOrder } from './stripe.js';
 import { createOrder, startOrderWorkflow } from './orders.js';
 import { handleInbound } from './inbox.js';
@@ -14,6 +14,8 @@ import { sendMail, orderReceivedEmail, approvedEmail } from './mail.js';
 import { createPrintOrder } from './prodigi.js';
 import { etsyConnect, etsyCallback, pollEtsy } from './etsy.js';
 import { VoucherWorkflow, redeemVoucher } from './voucher.js';
+import { adsScript, adsReport, adsCommands, adsAdminCommand, adsSummary } from './ads.js';
+import { stripePost } from './stripe.js';
 
 export { OrderWorkflow, OutreachWorkflow, AgentWorkflow, VoucherWorkflow };
 
@@ -41,6 +43,10 @@ export default {
 
       if (p === '/stripe/webhook' && req.method === 'POST') return stripeWebhook(req, env, ctx);
       if (p === '/voucher/redeem') return redeemVoucher(req, env); // from housealmanac.co.uk/redeem (CORS)
+      // Google Ads monitor (a script inside the Ads account loads its code here, reports stats, picks up commands).
+      if (p === '/ads/script.js') return adsScript(env);
+      if (p === '/ads/commands') { await ensureSchema(env); return adsCommands(env); }
+      if (p === '/ads/report' && req.method === 'POST') { await ensureSchema(env); return adsReport(req, env); }
       if (p === '/etsy/connect') { await ensureSchema(env); return etsyConnect(env); }
       if (p === '/etsy/callback') { await ensureSchema(env); return etsyCallback(env, url); }
 
@@ -165,6 +171,24 @@ async function admin(req, env, url) {
     await send(env, { to, subject: t.subject, orderId: o.id, text: `Apologies: the picture didn't come through on my last email, so here it is again.\n\n${t.text}`,
       inlineImage: { bytes, filename: `House-Almanac-proof-${o.id}.jpg`, url: `${env.PUBLIC_BASE}/f/${o.proof_key}` } });
     return json({ resent: to });
+  }
+  if (p === '/ads') return json({ summary: await adsSummary(env), report: JSON.parse(await kvGet(env, 'ads_report') || 'null') });
+  if (p === '/ads/command' && req.method === 'POST') return json(await adsAdminCommand(env, body));
+  if (p === '/stripe/link-redirects' && req.method === 'POST') {
+    // Point the consumer payment links at /thanks (fires the Google Ads purchase conversion). dry:true only lists them.
+    const want = { 'https://buy.stripe.com/4gM14p7UJfBSffW9512wU00': 'framed', 'https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01': 'unframed',
+      'https://buy.stripe.com/28EcN74IxdtKebS2GD2wU03': 'voucher-framed', 'https://buy.stripe.com/6oUdRb0shfBSffW1Cz2wU04': 'voucher-unframed' };
+    const links = await stripeGet(env, '/payment_links?limit=50');
+    const out = [];
+    for (const l of links.data || []) {
+      const kind = want[l.url];
+      if (!kind) continue;
+      const target = `https://housealmanac.co.uk/thanks?p=${kind}&sid={CHECKOUT_SESSION_ID}`;
+      if (body.dry) { out.push({ id: l.id, kind, after_completion: l.after_completion }); continue; }
+      const r = await stripePost(env, `/payment_links/${l.id}`, { 'after_completion[type]': 'redirect', 'after_completion[redirect][url]': target });
+      out.push({ id: l.id, kind, after_completion: r.after_completion });
+    }
+    return json(out);
   }
   if (p === '/vouchers') return json((await env.DB.prepare('SELECT * FROM vouchers ORDER BY created_at DESC LIMIT 100').all()).results);
   if (p === '/voucher/test' && req.method === 'POST') {
