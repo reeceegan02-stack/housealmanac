@@ -174,6 +174,7 @@ async function admin(req, env, url) {
   }
   if (p === '/ads') return json({ summary: await adsSummary(env), report: JSON.parse(await kvGet(env, 'ads_report') || 'null') });
   if (p === '/ads/command' && req.method === 'POST') return json(await adsAdminCommand(env, body));
+  if (p === '/ads/offline' && req.method === 'POST') { await (await import('./util.js')).kvSet(env, 'ads_offline_enabled', body.enabled ? 'true' : 'false'); return json({ ok: true, enabled: !!body.enabled }); }
   if (p === '/stripe/link-redirects' && req.method === 'POST') return json(await setLinkRedirects(env, { dry: !!body.dry }));
   if (p === '/vouchers') return json((await env.DB.prepare('SELECT * FROM vouchers ORDER BY created_at DESC LIMIT 100').all()).results);
   if (p === '/voucher/test' && req.method === 'POST') {

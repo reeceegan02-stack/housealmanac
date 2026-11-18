@@ -17,9 +17,8 @@
   s.src = 'https://www.googletagmanager.com/gtag/js?id=' + AW;
   document.head.appendChild(s);
 
-  // Carry the Google Ads click id into Stripe checkout (client_reference_id), so a sale can be reported back to
-  // Google from our server. Nothing is stored in the browser: the id comes from this page's URL (or Google's own
-  // cookie when the visitor accepted cookies).
+  // For visitors who accepted cookies: carry the Google Ads click id into Stripe checkout (client_reference_id), so
+  // a sale can be reported back to Google from our server. The id comes from this page's URL or Google's own cookie.
   function clickId() {
     var m = location.search.match(/[?&]gclid=([A-Za-z0-9_-]{10,180})/);
     if (m) return m[1];
@@ -27,6 +26,9 @@
     return c ? c[1] : null;
   }
   function tagLinks() {
+    var ok = null;
+    try { ok = localStorage.getItem('ha_consent'); } catch (e) {}
+    if (ok !== 'granted') return; // only for visitors who accepted advertising cookies
     var id = clickId();
     if (!id) return;
     var links = document.querySelectorAll('a[href^="https://buy.stripe.com/"]');
@@ -43,6 +45,7 @@
   function choose(v) {
     try { localStorage.setItem('ha_consent', v); } catch (e) {}
     if (v === 'granted') gtag('consent', 'update', { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted', analytics_storage: 'granted' });
+    if (v === 'granted') tagLinks();
     var b = document.getElementById('ha-cookie'); if (b) b.remove();
   }
   function show() {

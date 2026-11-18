@@ -122,7 +122,8 @@ async function setCommands(env, c) {
 }
 export async function adsCommands(env) {
   const c = await getCommands(env);
-  const conv = await pendingConversions(env).catch(() => []);
+  // Uploads only once the "Stripe purchase (import)" conversion action exists in Google Ads (kv ads_offline_enabled=true).
+  const conv = (await kvGet(env, 'ads_offline_enabled')) === 'true' ? await pendingConversions(env).catch(() => []) : [];
   return json({ negatives: (c.negatives || []).map(n => ({ text: n.text, match: n.match })), pause: c.pause || [], enable: c.enable || [],
     conversion_name: ADS_CONVERSION_NAME,
     conversions: conv.map(x => ({ id: x.session_id.slice(-12), gclid: x.gclid, at: x.at, value: x.value_pence / 100 })) });
