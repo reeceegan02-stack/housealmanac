@@ -101,6 +101,8 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
   A restarted order reuses its saved research (data_json); set data_json to null first to force fresh research.
 - Claude API: Reece's Console org, $100 free credit until 24 Nov 2026, then $20 prepaid (bought 9 Nov, auto-reload OFF by Reece's choice).
   ~$0.30 per order. The worker estimates usage (kv claude_usd_*) and emails hello@ when under ~$5 is left; top-ups need Reece's yes.
+  Burn on 18 Nov: ~$6 per weekday, mostly agent office previews. Once only $6 of prepaid is left, outreach and pitches pause automatically
+  (controls.js creditReserveHit) so customer orders can still be researched. After any top-up, raise PREPAID_USD in claude.js.
 - Secrets (ANTHROPIC_API_KEY, PRODIGI_API_KEY, STRIPE_SECRET_KEY (restricted), STRIPE_WEBHOOK_SECRET, later ETSY_KEYSTRING/ETSY_SHARED_SECRET)
   live as **Build** secrets on housealmanac-ops (Settings → Build → Variables and secrets). Each Workers Build copies them into runtime
   secrets (`ops/scripts/sync-secrets.mjs`, run by wrangler's custom build). To rotate: change the build secret, then retry the build.
@@ -134,5 +136,5 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - `ops/` cloud operations worker · `site/` website · `pipeline/` print templates and render scripts · `marketing/` mockups, Etsy listing, ad copy · `business/` pricing model, ledger, prospects.
 
 ## Budget tracker (£2,000 all-in, from 9 Nov 2026)
-Spent to 18 Nov: £93.38 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency sample 1 £51.30). Committed: 4 more free framed samples × £51.30; Etsy Ads up to ~£65 (Reece said yes 9 Nov: £4/day, 24 Nov–9 Dec, Etsy's new-shop wait ends 24 Nov; scheduled reminders switch it on 24 Nov and off 9 Dec).
+Spent to 18 Nov: £96.36 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency sample 1 £51.30, Etsy fees £2.98). Committed: 4 more free framed samples × £51.30; Etsy Ads up to ~£65 (Reece said yes 9 Nov: £4/day, 24 Nov–9 Dec, Etsy's new-shop wait ends 24 Nov; scheduled reminders switch it on 24 Nov and off 9 Dec).
 Keep this line current; the weekly growth agent recomputes it from business/ledger.csv.

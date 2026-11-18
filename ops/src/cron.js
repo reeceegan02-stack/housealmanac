@@ -96,7 +96,7 @@ export async function weeklySummary(env, { dry = false } = {}) {
   const replies = await all(`SELECT json_extract(detail, '$.intent') intent, count(*) n FROM events WHERE kind = 'agent_mail' AND at >= ? GROUP BY intent`, since);
   const samples = await samplesStatus(env);
   const pitches = (await one(`SELECT count(*) n FROM outbox_queue WHERE status = 'sent' AND sent_at >= ?`, since).catch(() => ({ n: 0 }))).n;
-  const pitchReplies = (await one(`SELECT count(*) n FROM events WHERE kind = 'general_mail' AND at >= ?`, since)).n;
+  const pitchReplies = (await one(`SELECT count(*) n FROM events WHERE kind = 'general_mail' AND at >= ? AND coalesce(json_extract(detail, '$.intent'), '') NOT IN ('supplier_or_sales_pitch', 'spam')`, since)).n;
   const growth = await one(`SELECT detail FROM events WHERE kind = 'agent_growth' ORDER BY id DESC LIMIT 1`);
   let growthNote = ''; try { growthNote = JSON.parse(growth?.detail || '{}').final || ''; } catch {}
   const sys = await systemsCheck(env);
