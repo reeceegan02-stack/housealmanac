@@ -1,7 +1,7 @@
 # Google Ads (account 498-155-5331)
 
 Account: Reece's Google login, payments profile "reece egan-sheath" (Individual, UK), GBP, UK time, Postpay.
-Bank account ••50 added by Reece 18 Nov; verification pending (Billing → Settings → Fix it; only Reece can do it). Ads don't serve until then.
+Bank account ••50 added and verified by Reece 18 Nov.
 Do NOT link the BICS (NW) Business Profile Google suggests (it's Reece's client). No Meta (Reece's accounts get banned).
 Budget: Reece agreed max £300 total. Campaign uses a campaign TOTAL budget of £280, so it cannot overspend.
 
@@ -37,15 +37,21 @@ Descriptions:
 Sitelinks: Gift Vouchers → /gift · See a Sample Print → /#whats-on-it · Prices → /#prices · How It Works → /#how
 Callouts: Free UK Delivery · Proof Before Printing · Framed or Unframed A3 · Gift Vouchers Available
 
+## Monitoring and upkeep (runs without Reece)
+- Google Ads script "House Almanac monitor" (id 12742311) in the account: loads ops/src/ads.js code from the worker, reports stats hourly,
+  applies queued negatives/pause/enable. One-time: Reece clicks Authorize → Allow; then set Frequency to Hourly.
+- Daily ops agent (07:00 UTC) reads the search terms and adds negatives through a guard that rejects anything blocking our keywords.
+- status.json → google_ads (spend, clicks, conversions, campaign/ad status, script errors); weekly update email shows spend vs the cap.
+
 ## Conversion tracking
 - site/ads.js loads the Google tag with consent mode v2 (denied until the visitor accepts the cookie banner; url_passthrough on).
 - site/thanks.html fires the Purchase conversion once per checkout session with the right value.
-- Still to do: Stripe Payment Links → "After payment: redirect to your website" for the 4 consumer links:
+- Stripe Payment Links → "After payment: redirect" for the 4 consumer links is set by the worker's cron via the Stripe API (once):
   framed → https://housealmanac.co.uk/thanks?p=framed&sid={CHECKOUT_SESSION_ID}
   unframed → https://housealmanac.co.uk/thanks?p=unframed&sid={CHECKOUT_SESSION_ID}
   voucher framed → https://housealmanac.co.uk/thanks?p=voucher-framed&sid={CHECKOUT_SESSION_ID}
   voucher unframed → https://housealmanac.co.uk/thanks?p=voucher-unframed&sid={CHECKOUT_SESSION_ID}
-  Needs Reece signed in to dashboard.stripe.com in Chrome (it was logged out on 18 Nov).
+  If the restricted Stripe key lacks Payment Links write permission, status.json controls.stripe_redirects shows the error.
 
 ## Weekly check
 Search terms report: add negatives for irrelevant queries. Pause keywords with spend but no engagement. Log spend in business/ledger.csv.
