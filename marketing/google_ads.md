@@ -43,15 +43,14 @@ Callouts: Free UK Delivery · Proof Before Printing · Framed or Unframed A3 · 
 - Daily ops agent (07:00 UTC) reads the search terms and adds negatives through a guard that rejects anything blocking our keywords.
 - status.json → google_ads (spend, clicks, conversions, campaign/ad status, script errors); weekly update email shows spend vs the cap.
 
-## Conversion tracking
-- site/ads.js loads the Google tag with consent mode v2 (denied until the visitor accepts the cookie banner; url_passthrough on).
-- site/thanks.html fires the Purchase conversion once per checkout session with the right value.
-- Stripe Payment Links → "After payment: redirect" for the 4 consumer links is set by the worker's cron via the Stripe API (once):
-  framed → https://housealmanac.co.uk/thanks?p=framed&sid={CHECKOUT_SESSION_ID}
-  unframed → https://housealmanac.co.uk/thanks?p=unframed&sid={CHECKOUT_SESSION_ID}
-  voucher framed → https://housealmanac.co.uk/thanks?p=voucher-framed&sid={CHECKOUT_SESSION_ID}
-  voucher unframed → https://housealmanac.co.uk/thanks?p=voucher-unframed&sid={CHECKOUT_SESSION_ID}
-  If the restricted Stripe key lacks Payment Links write permission, status.json controls.stripe_redirects shows the error.
+## Conversion tracking (not live yet; see CLAUDE.md "Sales tracking" for the two routes)
+- site/ads.js loads the Google tag with consent mode v2 (denied until the visitor accepts; url_passthrough on), and for visitors who accepted,
+  adds client_reference_id=g-<gclid> to Stripe links.
+- Route (a): Stripe after-payment redirect to /thanks (fires the Purchase tag). Blocked: restricted key lacks Payment Links permissions and
+  the House Almanac Stripe login isn't in Chrome.
+- Route (b): offline import "Stripe purchase (import)" uploaded by the monitor script. Blocked on Reece's yes to Google's EU user consent
+  policy declaration when creating the action; then POST /admin/ads/offline {enabled:true}.
+- Until then: Maximise clicks doesn't need conversions; sales are visible in Stripe/weekly update anyway.
 
 ## Weekly check
-Search terms report: add negatives for irrelevant queries. Pause keywords with spend but no engagement. Log spend in business/ledger.csv.
+Handled by the monitor + daily ops agent (search terms → negatives). Log spend in business/ledger.csv from Billing → Summary.
