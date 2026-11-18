@@ -62,14 +62,19 @@ Gift vouchers (9 Nov): framed £89 https://buy.stripe.com/28EcN74IxdtKebS2GD2wU0
   "reece egan-sheath" (Individual, UK), GBP, Postpay, bank account ••50 added by Reece 18 Nov (verification pending: only he can verify).
   Campaign "House history prints - Search UK" (id 24485609945) published 18 Nov: Search only, UK presence, Maximise clicks max CPC £0.80,
   campaign TOTAL budget £280 hard cap, 18 Nov–23 Dec, AI Max/auto assets off, 15 keywords, 22 negatives, 1 RSA, 4 sitelinks, 4 callouts.
-  Conversion: Purchase AW-18582430154/5cGlCKi737odEMrD5ZxF fires on site/thanks.html. The cron sets the 4 consumer payment links'
-  after-payment redirect to /thanks itself (stripeRedirectsOnce, via the API; result in status.json controls.stripe_redirects).
-  Bank ••50 verified 18 Nov; ads were in review that afternoon. Never link the BICS (NW) Business Profile Google offers (his client's).
-  **Monitoring (no API keys)**: Google Ads script "House Almanac monitor" (Tools → Bulk actions → Scripts, id 12742311) is a 2-line loader that
-  evals GET /ads/script.js (code in ops/src/ads.js), posts stats + search terms to POST /ads/report and applies commands from GET /ads/commands
-  (negatives, pause/enable). Needs Reece's one-time Authorize → Allow (Google consent pop-up), then Frequency: Hourly. Daily ops agent reviews
-  search terms and queues negatives (add_ads_negatives, guarded so it can never block our keywords); status.json has google_ads aggregates
-  (no search terms); weekly update shows spend vs the £280 cap. Admin: GET /admin/ads, POST /admin/ads/command {negatives|pause|enable}.
+  Bank ••50 verified 18 Nov; ad APPROVED and campaign SERVING (learning) 18 Nov 14:49. Never link the BICS (NW) Business Profile Google offers.
+  **Monitoring (no API keys), LIVE 18 Nov**: Google Ads script "House Almanac monitor" (Tools → Bulk actions → Scripts, id 12742311, authorised,
+  Frequency: Hourly) is a 2-line loader that evals GET /ads/script.js (code in ops/src/ads.js): posts stats + search terms to POST /ads/report,
+  applies commands from GET /ads/commands (negatives, pause/enable, offline conversions). Daily ops agent reviews search terms and queues negatives
+  (add_ads_negatives, guarded so it can never block our keywords); status.json → google_ads (aggregates, no search terms); weekly update shows
+  spend vs the £280 cap. Admin: GET /admin/ads, POST /admin/ads/command {negatives|pause|enable}, POST /admin/ads/offline {enabled}.
+  **Sales tracking: not live yet.** (a) Tag route: Purchase AW-18582430154/5cGlCKi737odEMrD5ZxF fires on site/thanks.html, but the Stripe
+  payment links don't redirect there: the restricted key lacks Payment Links read/write and the House Almanac Stripe login isn't in Chrome
+  (Chrome is signed in to Reece's Refined Business Consulting Stripe account; never use that one). Cron retry is switched off.
+  (b) Import route, ready in code: site/ads.js adds client_reference_id=g-<gclid> to Stripe links for visitors who accepted cookies;
+  ingestStripeSession records it (D1 ad_conversions); the script uploads them as offline conversions named "Stripe purchase (import)".
+  Needs: that conversion action created in Goals → Conversions (offline, "set up data source later"), which requires ticking Google's EU user
+  consent policy declaration = Reece's explicit yes; then POST /admin/ads/offline {enabled:true}. Use (a) or (b), not both (double counting).
 
 ## Automation (runs 24/7 in Cloudflare, no laptop needed)
 Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `main` via Workers Builds, root `/ops`).
