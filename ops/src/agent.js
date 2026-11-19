@@ -127,6 +127,7 @@ Review it and act:
   Search terms so far (private, not in the public snapshot): ${ads ? JSON.stringify(ads).slice(0, 9000) : 'no report yet'}
   Add negatives (add_ads_negatives) only for search terms that clearly show no intent to buy a house-history print or a new-home/housewarming/Christmas gift: people after free or official records (deeds, Land Registry, planning, census), house prices or valuations, jobs or courses, other products (canvas, wallpaper, posters of famous maps), other brands or places to visit. Prefer one distinctive word as BROAD, or the exact term as EXACT. Never block terms about house history prints, old maps of a street, personalised house prints, or new-home/housewarming gifts. Skip terms already negative or pending.
   If google_ads.stale is true for a second day, or ads are disapproved, or the campaign is not serving for a reason only Reece can fix (billing/payment, account suspended), email Reece once with the exact fix. Low clicks alone are not a reason to email.
+- Sales tracking for Google Ads uses the offline import route; Stripe payment-link redirects and Stripe key permissions are NOT needed. Never email Reece about them.
 - Email Reece ONLY if he must do something himself (approve a card charge such as a Claude credit top-up when the prepaid $20 is nearly used, create an account, a system that keeps failing, or anything that needs a decision). Do not send routine summaries.
 Finish with a 1-3 line note of what you did.`,
     tools: ['restart_order', 'set_outreach', 'add_ads_negatives', 'email_owner'],
