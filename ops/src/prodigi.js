@@ -67,3 +67,21 @@ export async function prodigiCheck(env) {
   const d = await call(env, `/products/${SKUS.framed}`);
   return { ok: !!d.product, attributes: d.product?.attributes || {} };
 }
+
+// Admin: price-check candidate SKUs (product details + a GB Standard quote each), to compare papers and costs.
+export async function quoteSkus(env, skus = []) {
+  const out = [];
+  for (const sku of skus.slice(0, 20)) {
+    try {
+      const p = (await call(env, `/products/${sku}`)).product || {};
+      const attributes = {};
+      for (const [k, opts] of Object.entries(p.attributes || {})) if (Array.isArray(opts) && opts.length) attributes[k] = opts[0];
+      const q = await call(env, '/quotes', { method: 'POST', body: JSON.stringify({ shippingMethod: 'Standard', destinationCountryCode: 'GB', currencyCode: 'GBP',
+        items: [{ sku, copies: 1, attributes, assets: [{ printArea: 'default' }] }] }) });
+      const c = q.quotes?.[0]?.costSummary || {};
+      out.push({ sku, ok: true, description: p.description, attributes: p.attributes, item: c.items?.amount, shipping: c.shipping?.amount, tax: c.totalTax?.amount, total: c.totalCost?.amount,
+        shipments: (q.quotes?.[0]?.shipments || []).map(s => ({ carrier: s.carrier?.name, service: s.carrier?.service, from: s.fulfillmentLocation?.labCode || s.fulfillmentLocation?.countryCode })) });
+    } catch (e) { out.push({ sku, ok: false, error: String(e.message).slice(0, 160) }); }
+  }
+  return out;
+}

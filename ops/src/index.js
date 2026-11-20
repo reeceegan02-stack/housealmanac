@@ -173,6 +173,7 @@ async function admin(req, env, url) {
     return json({ resent: to });
   }
   if (p === '/ads') return json({ summary: await adsSummary(env), report: JSON.parse(await kvGet(env, 'ads_report') || 'null') });
+  if (p === '/prodigi/quote' && req.method === 'POST') return json(await (await import('./prodigi.js')).quoteSkus(env, body.skus || []));
   if (p === '/ads/command' && req.method === 'POST') return json(await adsAdminCommand(env, body));
   if (p === '/ads/offline' && req.method === 'POST') { await (await import('./util.js')).kvSet(env, 'ads_offline_enabled', body.enabled ? 'true' : 'false'); return json({ ok: true, enabled: !!body.enabled }); }
   if (p === '/stripe/link-redirects' && req.method === 'POST') return json(await setLinkRedirects(env, { dry: !!body.dry }));
