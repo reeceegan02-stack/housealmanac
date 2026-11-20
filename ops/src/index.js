@@ -173,6 +173,18 @@ async function admin(req, env, url) {
     return json({ resent: to });
   }
   if (p === '/ads') return json({ summary: await adsSummary(env), report: JSON.parse(await kvGet(env, 'ads_report') || 'null') });
+  if (p === '/stripe/session-test' && req.method === 'POST') {
+    // Can our restricted key create (and expire) a one-off Checkout Session? Nothing is charged.
+    const { stripePost } = await import('./stripe.js');
+    try {
+      const sess = await stripePost(env, '/checkout/sessions', { mode: 'payment', 'line_items[0][quantity]': '1',
+        'line_items[0][price_data][currency]': 'gbp', 'line_items[0][price_data][unit_amount]': '3900',
+        'line_items[0][price_data][product_data][name]': 'Permission test (not for sale)', success_url: 'https://housealmanac.co.uk/' });
+      let expired = null;
+      try { expired = (await stripePost(env, `/checkout/sessions/${sess.id}/expire`, {})).status; } catch (e) { expired = 'expire failed: ' + e.message.slice(0, 120); }
+      return json({ create: 'ok', status: sess.status, expired });
+    } catch (e) { return json({ create: 'failed', error: e.message.replace(/[rs]k_\w+/g, '[key]').slice(0, 300) }); }
+  }
   if (p === '/prodigi/quote' && req.method === 'POST') return json(await (await import('./prodigi.js')).quoteSkus(env, body.skus || []));
   if (p === '/ads/command' && req.method === 'POST') return json(await adsAdminCommand(env, body));
   if (p === '/ads/offline' && req.method === 'POST') { await (await import('./util.js')).kvSet(env, 'ads_offline_enabled', body.enabled ? 'true' : 'false'); return json({ ok: true, enabled: !!body.enabled }); }
