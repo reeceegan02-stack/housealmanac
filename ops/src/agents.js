@@ -63,7 +63,8 @@ function page(title, msg, status = 200) {
 
 export async function payUnframed(env, id) {
   const o = await getOrder(env, id);
-  const ok = o && o.file_key && !o.external_ref && ['agent-proof', 'agent-preview'].includes(o.source) && ['proof_sent', 'awaiting_payment', 'needs_attention'].includes(o.status);
+  const unpaid = o && (!o.external_ref || String(o.external_ref).startsWith('preview-'));
+  const ok = unpaid && o.file_key && ['agent-proof', 'agent-preview'].includes(o.source) && ['proof_sent', 'awaiting_payment', 'needs_attention'].includes(o.status);
   if (!ok) return page('This link has expired', 'This print has already been paid for, or the link is no longer valid. Email <a href="mailto:hello@housealmanac.co.uk">hello@housealmanac.co.uk</a> and we\'ll sort it straight away.', 410);
   const ship = JSON.parse(o.ship_json || '{}');
   const email = ship.agent_email || o.email || '';

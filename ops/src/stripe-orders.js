@@ -18,7 +18,9 @@ export async function ingestStripeSession(env, sessionId) {
   // Agent paying for a proof we already made (link carries ?client_reference_id=HA-XXXXXX).
   if (s.client_reference_id) {
     const o = await getOrder(env, s.client_reference_id);
-    if (o && !o.external_ref && o.file_key && ['awaiting_payment', 'proof_sent', 'needs_attention'].includes(o.status)) return payForProof(env, o, s);
+    // Office previews carry external_ref 'preview-<email>' (dedupe), which doesn't mean paid.
+    const unpaid = o && (!o.external_ref || String(o.external_ref).startsWith('preview-'));
+    if (unpaid && o.file_key && ['awaiting_payment', 'proof_sent', 'needs_attention'].includes(o.status)) return payForProof(env, o, s);
   }
   const fields = sessionToOrder(s);
   const order = await createOrder(env, { source: 'stripe', ...fields });
