@@ -58,7 +58,7 @@ export function unframedPayLink(env, orderId) { return `${env.PUBLIC_BASE}/pay/$
 
 function page(title, msg, status = 200) {
   return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — House Almanac</title><body style="margin:0;background:#f6f1e7;color:#2a241e;font:17px/1.6 system-ui,sans-serif"><main style="max-width:560px;margin:0 auto;padding:60px 20px"><p style="font:700 20px Georgia,serif">House Almanac</p><h1 style="font:700 30px Georgia,serif">${title}</h1><p>${msg}</p></main>`,
-    { status, headers: { 'content-type': 'text/html; charset=utf-8' } });
+    { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
 
 export async function payUnframed(env, id) {

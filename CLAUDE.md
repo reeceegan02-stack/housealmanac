@@ -37,9 +37,16 @@ Gift vouchers (9 Nov): framed £89 https://buy.stripe.com/28EcN74IxdtKebS2GD2wU0
 Unframed A3 ships ROLLED in a cardboard tube via Evri (Prodigi help article); Reece's test print arrived creased. 20 Nov: asked
 support@prodigi.com about flat/board-backed shipping and how GLOBAL-PAP-A3 / GLOBAL-HPR-A3 (Hahnemühle Photo Rag 308gsm, £21.66 delivered) ship;
 replies are logged as events kind supplier_mail (inbox never answers @prodigi mail). Alternatives priced 20 Nov: PAP £15.66, HPR/HGE £21.66, BLP poster £12.06.
-**Planned: unframed option for estate agents** (Reece's idea, 20 Nov): proposed £39 (profit £23.34, same as framed at £75); waiting on packaging fix,
-Reece's yes to the price, and Stripe key permissions (Checkout Sessions: Write + Payment Links: Write) so each proof gets per-order checkouts
-(test: POST /admin/stripe/session-test). Free office samples stay framed. Follow-up scheduled 23 Nov. Admin: POST /admin/prodigi/quote {skus}.
+**Unframed option for estate agents: BUILT, switched off** (Reece's idea; he said yes to £39 on 20 Nov; profit £23.34, same as framed at £75).
+Switch: AGENT_UNFRAMED in ops/src/pricing.js (false). When true: agent emails/kb/proof text offer "£75 framed or £39 unframed"; the approve
+reply carries both links; /pay/<order>/unframed creates a fresh £39 Stripe Checkout (client_reference_id + metadata product=unframed; fallback:
+public £39 link); payForProof prints unframed when metadata says so or amount <= £40. Tested 20 Nov (session created for a real preview, unpaid).
+Free office samples stay framed. Still to do when switching on: site/agents.html price row. **Only blocker: packaging** (Prodigi reply due;
+follow-up 23 Nov). Stripe restricted key "House Almanac ops" (rk_live…R4Pw) got Checkout Sessions: Write + Payment Links: Write on 20 Nov
+(Reece signed into the House Almanac Stripe login in Chrome and asked me to do it). Payment links' after-payment page is still Stripe's own
+confirmation: switching to /thanks redirects (POST /admin/stripe/link-redirects) would also fire the "Purchase" tag, so make that action
+secondary first to avoid double counting with the import route.
+Fixed 20 Nov: office-preview orders (external_ref 'preview-<email>') are treated as unpaid when an agency pays for them.
 
 ## Systems
 - Website: `site/` → Cloudflare Worker `housealmanac-web` (static assets), custom domains housealmanac.co.uk + www.
