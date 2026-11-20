@@ -1,3 +1,4 @@
+import { AGENT_UNFRAMED } from './pricing.js';
 // Scheduled jobs: shipping updates, stuck orders, agent follow-ups, weekly summary.
 import { ensureSchema, updateOrder, logEvent, now, BRAND } from './util.js';
 import { getPrintOrder } from './prodigi.js';
@@ -88,7 +89,7 @@ async function sampleFollowUp(env) {
 
 I hope the framed print of ${street} arrived safely and has found a spot in the branch.
 
-When your next sale completes, send me the buyer's new address and their names (and a line from you, if you like), and I'll email you a free proof. If you're happy with it, it's £75 framed and delivered to your branch, with your logo and a QR code to your reviews, then £65 each after your first order.
+When your next sale completes, send me the buyer's new address and their names (and a line from you, if you like), and I'll email you a free proof. If you're happy with it, it's £75 framed and delivered to your branch, with your logo and a QR code to your reviews, then £65 each after your first order${AGENT_UNFRAMED ? ' (or £39 as an unframed A3 print)' : ''}.
 
 Best wishes,
 Reece Egan-Sheath

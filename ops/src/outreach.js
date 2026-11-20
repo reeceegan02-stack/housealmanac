@@ -1,3 +1,4 @@
+import { AGENT_PRICES } from './pricing.js';
 // Estate-agent growth engine: finds agencies, emails them, follows up. Runs every weekday in a
 // Workflow (long-running), started by the cron at 10:00 UK.
 // PECR: only limited companies / LLPs, at an email address they publish themselves, sender
@@ -53,7 +54,7 @@ export function firstEmail(p, offerSample) {
 
 I run House Almanac, a Manchester business that makes framed A3 prints of a home's history: the street on a historic Ordnance Survey map, the same spot today, a short history and timeline, and a message from you.
 
-For agents, each print carries your logo and a QR code to your review page, and arrives framed at your branch ready for key handover. It's £75 a print, then £65 a print after your first order, paid per print with no contract.
+For agents, each print carries your logo and a QR code to your review page, and arrives framed at your branch ready for key handover. It's ${AGENT_PRICES}.
 
 There's an example and the details here: https://housealmanac.co.uk/agents
 
@@ -102,7 +103,7 @@ ${offerFree
   ? `If you'd like it framed for the branch, just reply "yes" and I'll send it to you framed, free of charge.`
   : `If you'd like it framed for the branch, it's £75 delivered. Just reply "yes".`}
 
-For your buyers, we make the same thing for their new home as a completion gift, with your logo and a QR code to your reviews: £75 each, then £65 each after your first order, no contract. Send me a buyer's new address and I'll email you a free proof first. Details: https://housealmanac.co.uk/agents
+For your buyers, we make the same thing for their new home as a completion gift, with your logo and a QR code to your reviews: ${AGENT_PRICES}. Send me a buyer's new address and I'll email you a free proof first. Details: https://housealmanac.co.uk/agents
 
 Best wishes,
 Reece Egan-Sheath

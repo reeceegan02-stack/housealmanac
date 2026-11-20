@@ -63,8 +63,10 @@ async function payForProof(env, o, s) {
   const sd = s.collected_information?.shipping_details || s.shipping_details;
   const a = sd?.address;
   const newShip = a?.postal_code ? { ...ship, name: sd.name || ship.name, line1: a.line1, line2: a.line2, city: a.city, county: a.state, postcode: a.postal_code } : ship;
-  await updateOrder(env, o.id, { external_ref: s.id, amount_pence: s.amount_total || 0, source: paidSource, status: 'approved', ship_json: JSON.stringify(newShip) });
-  const order = { ...o, ship_json: JSON.stringify(newShip), source: paidSource };
+  // Unframed if the checkout says so (agent £39 option) or the amount is the unframed price; otherwise as ordered.
+  const product = s.metadata?.product === 'unframed' || (s.amount_total > 0 && s.amount_total <= 4000) ? 'unframed' : (o.product || 'framed');
+  await updateOrder(env, o.id, { external_ref: s.id, amount_pence: s.amount_total || 0, source: paidSource, status: 'approved', ship_json: JSON.stringify(newShip), product });
+  const order = { ...o, ship_json: JSON.stringify(newShip), source: paidSource, product };
   try {
     const po = await createPrintOrder(env, order, fileUrl(env, o.file_key));
     await updateOrder(env, o.id, { status: 'printing', prodigi_id: po.id });

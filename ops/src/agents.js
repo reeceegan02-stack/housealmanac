@@ -1,6 +1,9 @@
 // Estate-agency pricing (Reece, 9 Nov 2026): always paid up front, £75 a print; after an agency's first paid
 // order we email them code AGENCY10 (£10 off, only valid on the £75 agent product), so it's £65 from then on.
-import { kvGet, kvSet, logEvent } from './util.js';
+import { kvGet, kvSet, logEvent, getOrder } from './util.js';
+import { stripePost } from './stripe.js';
+import { AGENT_UNFRAMED, AGENT_UNFRAMED_PENCE, AGENT_PRICES } from './pricing.js';
+export { AGENT_UNFRAMED, AGENT_UNFRAMED_PENCE, AGENT_PRICES };
 import { sendMail } from './mail.js';
 
 export const AGENCY_CODE = 'AGENCY10';
@@ -45,3 +48,47 @@ House Almanac · hello@housealmanac.co.uk`,
   });
   await logEvent(env, orderId, 'agency_code_sent', { domain: d });
 }
+
+// ---------- Unframed option for agents (Reece, 20 Nov 2026: £39, same ~£23 profit as framed at £75) ----------
+// Off until Stripe can create checkouts for us (restricted key: Checkout Sessions Write) and unframed packaging is sorted.
+const CONSUMER_UNFRAMED_LINK = 'https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01';
+
+// Emails carry this stable link; clicking it creates a fresh Stripe Checkout (sessions expire, emails don't).
+export function unframedPayLink(env, orderId) { return `${env.PUBLIC_BASE}/pay/${orderId}/unframed`; }
+
+function page(title, msg, status = 200) {
+  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — House Almanac</title><body style="margin:0;background:#f6f1e7;color:#2a241e;font:17px/1.6 system-ui,sans-serif"><main style="max-width:560px;margin:0 auto;padding:60px 20px"><p style="font:700 20px Georgia,serif">House Almanac</p><h1 style="font:700 30px Georgia,serif">${title}</h1><p>${msg}</p></main>`,
+    { status, headers: { 'content-type': 'text/html; charset=utf-8' } });
+}
+
+export async function payUnframed(env, id) {
+  const o = await getOrder(env, id);
+  const ok = o && o.file_key && !o.external_ref && ['agent-proof', 'agent-preview'].includes(o.source) && ['proof_sent', 'awaiting_payment', 'needs_attention'].includes(o.status);
+  if (!ok) return page('This link has expired', 'This print has already been paid for, or the link is no longer valid. Email <a href="mailto:hello@housealmanac.co.uk">hello@housealmanac.co.uk</a> and we\'ll sort it straight away.', 410);
+  const ship = JSON.parse(o.ship_json || '{}');
+  const email = ship.agent_email || o.email || '';
+  const street = String(o.address || '').split(',').slice(0, 2).join(',').trim();
+  try {
+    const params = {
+      mode: 'payment', 'line_items[0][quantity]': '1', 'line_items[0][price_data][currency]': 'gbp',
+      'line_items[0][price_data][unit_amount]': String(AGENT_UNFRAMED_PENCE),
+      'line_items[0][price_data][product_data][name]': `House Almanac A3 print, unframed (${o.id})`,
+      client_reference_id: o.id, 'metadata[product]': 'unframed', 'metadata[order]': o.id,
+      'shipping_address_collection[allowed_countries][0]': 'GB',
+      success_url: 'https://housealmanac.co.uk/thanks?p=agent&sid={CHECKOUT_SESSION_ID}', cancel_url: 'https://housealmanac.co.uk/agents',
+    };
+    if (street) params['line_items[0][price_data][product_data][description]'] = street.slice(0, 200);
+    if (email) params.customer_email = email;
+    const sess = await stripePost(env, '/checkout/sessions', params);
+    await logEvent(env, o.id, 'unframed_checkout', { session: sess.id });
+    return Response.redirect(sess.url, 303);
+  } catch (e) {
+    // Fallback: the public £39 link (asks for an address and style again, but payment still prints this proof unframed).
+    await logEvent(env, o.id, 'unframed_checkout_error', { error: String(e.message).replace(/[rs]k_\w+/g, '[key]').slice(0, 200) });
+    const u = new URL(CONSUMER_UNFRAMED_LINK);
+    u.searchParams.set('client_reference_id', o.id);
+    if (email) u.searchParams.set('prefilled_email', email);
+    return Response.redirect(u.toString(), 303);
+  }
+}
+

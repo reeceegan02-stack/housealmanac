@@ -1,3 +1,4 @@
+import { AGENT_UNFRAMED } from './pricing.js';
 // Business facts the inbox assistant may rely on. Keep in sync with the website.
 export const KB = `House Almanac (housealmanac.co.uk) makes personalised A3 prints about the history of a home and its street.
 Trading name of Reece Egan-Sheath, a sole trader in Manchester. Email: hello@housealmanac.co.uk. Not VAT-registered.
@@ -7,7 +8,7 @@ Products and prices (free UK delivery included):
 - Unframed A3 print on 200gsm matte art paper: £39. Order: https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01
 - Gift vouchers (https://housealmanac.co.uk/gift): framed £89 (https://buy.stripe.com/28EcN74IxdtKebS2GD2wU03) or unframed £39 (https://buy.stripe.com/6oUdRb0shfBSffW1Cz2wU04). Emailed to the buyer straight away as a printable PDF with a code (GIFT-XXXX-XXXX), so they can be bought right up to Christmas Day, after the 9 December order date. Valid 12 months. The recipient redeems it at https://housealmanac.co.uk/redeem with their address, then gets a proof to approve as normal. Unused vouchers can be refunded within 14 days of purchase. Lost voucher: we resend the code to the buyer's email. A voucher covers one print; no cash alternative.
 - Also on Etsy (shop HouseAlmanac).
-- Estate agents: completion gifts, framed and delivered to the branch, with the agency's logo and a QR code to their review page. £75 per print, paid online up front (https://buy.stripe.com/00w14pgrf75m1p62GD2wU02). After an agency's first paid order we email them code AGENCY10 for £10 off every later print (£65). Always paid up front per print: no monthly invoicing, credit accounts or payment terms. Agents send the buyer's new address and their message, we email a free proof, they pay when they approve. Details: https://housealmanac.co.uk/agents
+- Estate agents: completion gifts, framed and delivered to the branch, with the agency's logo and a QR code to their review page. £75 per print, paid online up front (https://buy.stripe.com/00w14pgrf75m1p62GD2wU02). After an agency's first paid order we email them code AGENCY10 for £10 off every later print (£65).${AGENT_UNFRAMED ? ' Agents can also choose an unframed A3 print (fine art paper, for the buyer to frame) at £39, paid per print; free office samples are always framed.' : ''} Always paid up front per print: no monthly invoicing, credit accounts or payment terms. Agents send the buyer's new address and their message, we email a free proof, they pay when they approve. Details: https://housealmanac.co.uk/agents
 - Four styles: Heritage (default), Modern, Midnight, Sage.
 - UK delivery only for now. England and Wales addresses.
 

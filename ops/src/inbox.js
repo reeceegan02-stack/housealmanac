@@ -8,7 +8,7 @@ import { sendMail, approvedEmail, firstName } from './mail.js';
 import { createPrintOrder } from './prodigi.js';
 import { stripeGet, stripePost } from './stripe.js';
 import { startOrderWorkflow } from './orders.js';
-import { agentPayLink } from './agents.js';
+import { agentPayLink, AGENT_UNFRAMED, unframedPayLink } from './agents.js';
 
 const FRAMED_LINK = 'https://buy.stripe.com/4gM14p7UJfBSffW9512wU00';
 const IGNORE_FROM = /(no-?reply|do-?not-?reply|mailer-daemon|postmaster|notifications?@|bounce|@stripe\.com|@prodigi\.com|@cloudflare\.com|@etsy\.com|@google\.com|@github\.com)/i;
@@ -174,7 +174,10 @@ Classify the email and draft a reply. JSON only:
 
 Great, thank you. To have it printed, framed and delivered to your branch, it's ${link.includes('prefilled_promo_code') ? '£65 with your agency discount' : '£75'} here (card, Apple Pay or Google Pay):
 ${link}
-
+${AGENT_UNFRAMED ? `
+Or as an unframed A3 print for your buyer to frame themselves, it's £39 here:
+${unframedPayLink(env, order.id)}
+` : ''}
 As soon as it's paid we send it to print, and it's dispatched within 2 to 4 working days with tracking. Your receipt comes from Stripe.
 
 Best wishes,
@@ -251,10 +254,10 @@ async function handleAgentMail(env, prospect, m) {
   const preview = await env.DB.prepare(`SELECT * FROM orders WHERE source = 'agent-preview' AND lower(json_extract(ship_json,'$.agent_domain')) = ? AND status IN ('proof_sent','awaiting_payment','revising','needs_attention') ORDER BY created_at DESC LIMIT 1`).bind(domain0).first();
   const legacy = !preview && JSON.parse(prospect.office_json || '{}').offer === 'buyer_sample'; // emailed before office previews: offered a free framed print for a buyer
   const offer = preview
-    ? `Our first email attached a free digital House Almanac print of their own office street (${preview.address}). ${samples.left > 0 ? 'We offered to frame it and send it to their branch free of charge.' : 'Framed for their branch it is £75 delivered.'} For their buyers: they send a buyer's new address, we email a free proof, and the framed print is £75 delivered to their branch.`
+    ? `Our first email attached a free digital House Almanac print of their own office street (${preview.address}). ${samples.left > 0 ? 'We offered to frame it and send it to their branch free of charge.' : 'Framed for their branch it is £75 delivered.'} For their buyers: they send a buyer's new address, we email a free proof, and the framed print is £75 delivered to their branch${AGENT_UNFRAMED ? ' (or £39 as an unframed A3 print)' : ''}.`
     : legacy && samples.left > 0
       ? `We offered this agency one free framed print for a buyer completing with them (${samples.left} free framed samples left in total).`
-      : `For their buyers we offer a free digital proof; the framed print is then £75 delivered to their branch. Don't offer a free framed print.`;
+      : `For their buyers we offer a free digital proof; the framed print is then £75 delivered to their branch${AGENT_UNFRAMED ? ' (or £39 as an unframed A3 print)' : ''}. Don't offer a free framed print.`;
   const { text } = await claude(env, {
     model: MODELS.research, maxTokens: 1500,
     system: `You handle email from estate agents for House Almanac, replying as Reece. Business facts:\n${KB}\n\n${offer} Be warm, brief, professional, British English, plain text. Never offer prices below £65 per print.`,
@@ -332,7 +335,7 @@ JSON only:
       to: m.from, subject: m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`, fromName: 'Reece Egan-Sheath | House Almanac',
       text: free
         ? `Hi,\n\nThank you, that's everything we need. We're researching ${street} now and will email you a proof within 2 working days (reference ${order.id}). Once you approve it, the framed print will be delivered to your branch, free of charge.\n\nBest wishes,\nReece\nHouse Almanac`
-        : `Hi,\n\nThank you. We're researching ${street} now and will email you a free proof within 2 working days (reference ${order.id}). If you'd like it printed and framed for your buyer, it's £75 delivered to your branch, and you can approve and pay in one step when the proof arrives.\n\nBest wishes,\nReece\nHouse Almanac`,
+        : `Hi,\n\nThank you. We're researching ${street} now and will email you a free proof within 2 working days (reference ${order.id}). If you'd like it printed for your buyer, it's £75 framed${AGENT_UNFRAMED ? ' or £39 unframed' : ''}, delivered to your branch, and you can approve and pay in one step when the proof arrives.\n\nBest wishes,\nReece\nHouse Almanac`,
     });
     if (!free) await overCapAlert(env, prospect.agency);
     return;

@@ -34,6 +34,11 @@ h1{font:700 clamp(32px,5vw,44px)/1.15 Lora,serif;margin:40px 0 12px}
   var p = q.get('p') || '';
   var sid = q.get('sid') || '';
   var values = { framed: 89, unframed: 39, 'voucher-framed': 89, 'voucher-unframed': 39 };
+  if (p === 'agent') {
+    document.getElementById('h').textContent = 'Thank you. Your print is on its way to the printer.';
+    document.getElementById('lead').textContent = "It's dispatched within 2 to 4 working days, and we'll email you the tracking as soon as it ships.";
+    document.getElementById('next').style.display = 'none';
+  }
   if (/^voucher/.test(p)) {
     document.getElementById('h').textContent = 'Thank you. Your gift voucher is on its way.';
     document.getElementById('lead').textContent = "It's being emailed to you as a printable PDF, usually within 10 minutes (check your spam folder if it hasn't arrived).";
