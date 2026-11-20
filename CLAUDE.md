@@ -49,7 +49,7 @@ Stripe restricted key "House Almanac ops" (rk_live…R4Pw) has Checkout Sessions
 House Almanac Stripe login in Chrome and asked me to do it). Payment links still use Stripe's own confirmation page; switching to /thanks
 redirects (POST /admin/stripe/link-redirects) would also fire the "Purchase" tag, so make that action secondary first (double counting).
 Fixed 20 Nov: office-preview orders (external_ref 'preview-<email>') are treated as unpaid when an agency pays for them.
-Etsy live listings still say 200gsm EMA for unframed until updated in Chrome (copy in marketing/etsy_listing.md).
+All 6 Etsy listing descriptions updated 20 Nov: unframed = 308gsm Hahnemühle Photo Rag, rolled; framed = 200gsm EMA (copy in marketing/etsy_listing.md).
 
 ## Systems
 - Website: `site/` → Cloudflare Worker `housealmanac-web` (static assets), custom domains housealmanac.co.uk + www.
