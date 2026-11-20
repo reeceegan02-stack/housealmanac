@@ -2,7 +2,7 @@
 // order we email them code AGENCY10 (£10 off, only valid on the £75 agent product), so it's £65 from then on.
 import { kvGet, kvSet, logEvent, getOrder } from './util.js';
 import { stripePost } from './stripe.js';
-import { AGENT_UNFRAMED, AGENT_UNFRAMED_PENCE, AGENT_PRICES } from './pricing.js';
+import { AGENT_UNFRAMED, AGENT_UNFRAMED_PENCE, AGENT_PRICES, SAMPLE_FRAME_UPGRADE_PENCE, sampleIsUnframed } from './pricing.js';
 export { AGENT_UNFRAMED, AGENT_UNFRAMED_PENCE, AGENT_PRICES };
 import { sendMail } from './mail.js';
 
@@ -13,7 +13,7 @@ const domainOf = (email) => String(email || '').toLowerCase().split('@')[1] || '
 export async function isReturningAgency(env, email) {
   const d = domainOf(email);
   if (!d || /^(gmail|googlemail|hotmail|outlook|live|yahoo|icloud|me|aol|btinternet)\./.test(d)) return false;
-  const r = await env.DB.prepare(`SELECT 1 FROM orders WHERE amount_pence > 0 AND status != 'cancelled' AND lower(substr(email, instr(email, '@') + 1)) = ? LIMIT 1`).bind(d).first();
+  const r = await env.DB.prepare(`SELECT 1 FROM orders WHERE amount_pence > 0 AND status != 'cancelled' AND source != 'agent-sample' AND lower(substr(email, instr(email, '@') + 1)) = ? LIMIT 1`).bind(d).first();
   return !!r;
 }
 
@@ -93,3 +93,38 @@ export async function payUnframed(env, id) {
   }
 }
 
+
+// Office sample framed for £30 (we cover the rest). Stable link in emails → fresh Stripe Checkout. If the free samples
+// have run out it falls back to the normal £75 agent link.
+export function frameUpgradeLink(env, orderId) { return `${env.PUBLIC_BASE}/pay/${orderId}/framed`; }
+
+export async function payFramedSample(env, id) {
+  const o = await getOrder(env, id);
+  const unpaid = o && (!o.external_ref || String(o.external_ref).startsWith('preview-'));
+  const ok = unpaid && o.file_key && o.source === 'agent-preview' && ['proof_sent', 'awaiting_payment', 'needs_attention'].includes(o.status);
+  if (!ok) return page('This link has expired', 'This print has already been sent or paid for, or the link is no longer valid. Email <a href="mailto:hello@housealmanac.co.uk">hello@housealmanac.co.uk</a> and we\'ll sort it straight away.', 410);
+  const ship = JSON.parse(o.ship_json || '{}');
+  const email = ship.agent_email || o.email || '';
+  const { samplesStatus } = await import('./outreach.js');
+  const left = (await samplesStatus(env)).left;
+  if (!sampleIsUnframed(o) || left <= 0) return Response.redirect(await agentPayLink(env, o.id, email), 303);
+  const street = String(o.address || '').split(',').slice(0, 2).join(',').trim();
+  try {
+    const params = {
+      mode: 'payment', 'line_items[0][quantity]': '1', 'line_items[0][price_data][currency]': 'gbp',
+      'line_items[0][price_data][unit_amount]': String(SAMPLE_FRAME_UPGRADE_PENCE),
+      'line_items[0][price_data][product_data][name]': `Framing for your House Almanac office print (${o.id})`,
+      client_reference_id: o.id, 'metadata[product]': 'framed', 'metadata[kind]': 'sample_upgrade', 'metadata[order]': o.id,
+      'shipping_address_collection[allowed_countries][0]': 'GB',
+      success_url: 'https://housealmanac.co.uk/thanks?p=agent&sid={CHECKOUT_SESSION_ID}', cancel_url: 'https://housealmanac.co.uk/agents',
+    };
+    if (street) params['line_items[0][price_data][product_data][description]'] = `${street}: framed in black, ready to hang`.slice(0, 200);
+    if (email) params.customer_email = email;
+    const sess = await stripePost(env, '/checkout/sessions', params);
+    await logEvent(env, o.id, 'sample_upgrade_checkout', { session: sess.id });
+    return Response.redirect(sess.url, 303);
+  } catch (e) {
+    await logEvent(env, o.id, 'sample_upgrade_checkout_error', { error: String(e.message).replace(/[rs]k_\w+/g, '[key]').slice(0, 200) });
+    return page('Sorry, that didn\'t work', 'We couldn\'t open the payment page just now. Reply to our email or write to <a href="mailto:hello@housealmanac.co.uk">hello@housealmanac.co.uk</a> and we\'ll send you a link.', 503);
+  }
+}

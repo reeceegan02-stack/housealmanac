@@ -84,10 +84,10 @@ async function sampleFollowUp(env) {
     street = street || String(o.address || '').split(',')[0];
     await sendMail(env, {
       to, orderId: o.id, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 30,
-      subject: `Your framed print of ${street}`,
+      subject: `Your ${o.product === 'unframed' ? '' : 'framed '}print of ${street}`,
       text: `Hi ${o.name} team,
 
-I hope the framed print of ${street} arrived safely and has found a spot in the branch.
+I hope the ${o.product === 'unframed' ? '' : 'framed '}print of ${street} arrived safely${o.product === 'unframed' ? '. If it has curled from the tube, a night under a few books flattens it' : ' and has found a spot in the branch'}.
 
 When your next sale completes, send me the buyer's new address and their names (and a line from you, if you like), and I'll email you a free proof. If you're happy with it, it's £75 framed and delivered to your branch, with your logo and a QR code to your reviews, then £65 each after your first order${AGENT_UNFRAMED ? ' (or £39 as an unframed A3 print)' : ''}.
 
@@ -165,7 +165,7 @@ Prints sent to the printer: ${printed.reduce((a, r) => a + r.n, 0)} (about £${p
 
 Estate agents: ${newAgencies} new agencies emailed and ${followUps} follow-ups this week; ${total} contacted in total.
 Replies this week: ${replies.map(r => `${r.n} ${String(r.intent || 'other').replace(/_/g, ' ')}`).join(', ') || 'none'}.
-Interested so far: ${st.interested || 0}. Free framed samples sent: ${samples.used} of ${samples.cap}. Paying agencies: ${samples.paying}.
+Interested so far: ${st.interested || 0}. Free office samples sent: ${samples.used} of ${samples.cap}. Paying agencies: ${samples.paying}.
 
 Press, gift guides and partners: ${pitches} pitches sent this week, ${pitchReplies} repl${pitchReplies === 1 ? 'y' : 'ies'}.
 

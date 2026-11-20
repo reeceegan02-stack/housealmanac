@@ -45,8 +45,8 @@ export default {
       if (p === '/voucher/redeem') return redeemVoucher(req, env); // from housealmanac.co.uk/redeem (CORS)
       // Google Ads monitor (a script inside the Ads account loads its code here, reports stats, picks up commands).
       // Agent unframed option: stable link in emails → fresh Stripe Checkout.
-      const payM = p.match(/^\/pay\/(HA-[A-Z0-9]{4,12})\/unframed$/);
-      if (payM) { await ensureSchema(env); return (await import('./agents.js')).payUnframed(env, payM[1]); }
+      const payM = p.match(/^\/pay\/(HA-[A-Z0-9]{4,12})\/(unframed|framed)$/);
+      if (payM) { await ensureSchema(env); const ag = await import('./agents.js'); return payM[2] === 'unframed' ? ag.payUnframed(env, payM[1]) : ag.payFramedSample(env, payM[1]); }
       if (p === '/ads/script.js') return adsScript(env);
       if (p === '/ads/commands') { await ensureSchema(env); return adsCommands(env); }
       if (p === '/ads/report' && req.method === 'POST') { await ensureSchema(env); return adsReport(req, env); }

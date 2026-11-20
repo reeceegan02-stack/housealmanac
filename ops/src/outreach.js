@@ -1,4 +1,4 @@
-import { AGENT_PRICES } from './pricing.js';
+import { AGENT_PRICES, AGENT_UNFRAMED, PAPER_UNFRAMED, sampleIsUnframed } from './pricing.js';
 // Estate-agent growth engine: finds agencies, emails them, follows up. Runs every weekday in a
 // Workflow (long-running), started by the cron at 10:00 UK.
 // PECR: only limited companies / LLPs, at an email address they publish themselves, sender
@@ -38,7 +38,7 @@ export async function samplesStatus(env) {
   const used = (await env.DB.prepare(`SELECT count(*) n FROM orders WHERE source = 'agent-sample' AND status != 'cancelled'`).first()).n;
   const paying = (await env.DB.prepare(`SELECT count(DISTINCT p.domain) n FROM orders o JOIN prospects p
       ON p.domain = lower(substr(o.email, instr(o.email, '@') + 1))
-      WHERE o.amount_pence > 0 AND o.status NOT IN ('cancelled') AND o.email IS NOT NULL`).first()).n;
+      WHERE o.amount_pence > 0 AND o.status NOT IN ('cancelled') AND o.source != 'agent-sample' AND o.email IS NOT NULL`).first()).n;
   const cap = base + paying;
   return { cap, used, paying, left: Math.max(0, cap - used) };
 }
@@ -87,21 +87,33 @@ If this isn't for you, reply "no thanks" and I won't email again.`,
   };
 }
 
+
+// What we offer for the agency's own office print. order = the preview order (decides old vs new sample offer).
+function officeOffer(env, order, offerFree, short = false) {
+  if (offerFree && order && sampleIsUnframed(order)) {
+    const link = `${env.PUBLIC_BASE}/pay/${order.id}/framed`;
+    return short
+      ? `If you'd like it for the branch, reply "yes" and I'll post it free as an unframed A3 print, or have it framed and ready to hang for £30: ${link}`
+      : `If you'd like it for the branch, just reply "yes" and I'll post it to you free as an unframed A3 print on ${PAPER_UNFRAMED}. Or, if you'd rather have it framed in black and ready to hang, it's £30 (we cover the rest): ${link}`;
+  }
+  if (offerFree) return short ? `If you'd like it framed for the branch, reply "yes" and it's yours, free.` : `If you'd like it framed for the branch, just reply "yes" and I'll send it to you framed, free of charge.`;
+  const price = AGENT_UNFRAMED ? '£75 framed or £39 unframed, delivered' : '£75 delivered';
+  return short ? `If you'd like it for the branch, it's ${price}; reply "yes".` : `If you'd like it for the branch, it's ${price}. Just reply "yes".`;
+}
+
 const areaName = (p) => String(p.area || '').split(',')[0].trim() || 'your area';
 
 // First email with the agency's own office print attached (Reece's idea, 9 Nov 2026).
-export function officePreviewEmail(p, street, offerFree) {
+export function officePreviewEmail(p, street, offerFree, env, order) {
   return {
     subject: `The history of ${street}, for ${p.agency}`,
     text: `Hi ${p.agency} team,
 
-I run House Almanac, a Manchester business that makes framed A3 prints of a home's history. To show you what they look like, I made one for your office on ${street}. It's below.
+I run House Almanac, a Manchester business that makes A3 prints of a home's history. To show you what they look like, I made one for your office on ${street}. It's below.
 
 Each print has the street on a historic Ordnance Survey map, the same spot today, a short history and timeline, and a personal message.
 
-${offerFree
-  ? `If you'd like it framed for the branch, just reply "yes" and I'll send it to you framed, free of charge.`
-  : `If you'd like it framed for the branch, it's £75 delivered. Just reply "yes".`}
+${officeOffer(env, order, offerFree)}
 
 For your buyers, we make the same thing for their new home as a completion gift, with your logo and a QR code to your reviews: ${AGENT_PRICES}. Send me a buyer's new address and I'll email you a free proof first. Details: https://housealmanac.co.uk/agents
 
@@ -113,14 +125,12 @@ If this isn't for you, reply "no thanks" and I won't email again.`,
   };
 }
 
-export function officeFollowUpEmail(p, street, offerFree) {
+export function officeFollowUpEmail(p, street, offerFree, env, order) {
   return {
     subject: `Re: The history of ${street}, for ${p.agency}`,
     text: `Hi ${p.agency} team,
 
-Just checking the print of ${street} reached you (it was in my last email). ${offerFree
-  ? `If you'd like it framed for the branch, reply "yes" and it's yours, free.`
-  : `If you'd like it framed for the branch, it's £75 delivered; reply "yes".`}
+Just checking the print of ${street} reached you (it was in my last email). ${officeOffer(env, order, offerFree, true)}
 
 And if you have a buyer completing soon, send me their new address and I'll email you a free proof of their print.
 
@@ -257,7 +267,7 @@ export async function sendPreviewEmail(env, order, street, proofBytes) {
   if (!p || ['opted_out', 'bounced'].includes(p.status)) return { skipped: true };
   const s = await samplesStatus(env);
   const office = JSON.parse(p.office_json || '{}');
-  const t = proofBytes ? officePreviewEmail(p, street, s.left > 0) : firstEmail(p, false);
+  const t = proofBytes ? officePreviewEmail(p, street, s.left > 0, env, order) : firstEmail(p, false);
   await sendMail(env, {
     to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 6, orderId: order.id,
     inlineImage: proofBytes ? { bytes: proofBytes, filename: `${street.replace(/[^A-Za-z0-9]+/g, '-')}-House-Almanac.jpg`, url: order.proof_key ? `${env.PUBLIC_BASE}/f/${order.proof_key}` : null } : undefined,
@@ -273,7 +283,8 @@ export async function sendFollowUps(env) {
   let sent = 0;
   for (const p of results) {
     const office = JSON.parse(p.office_json || '{}');
-    const t = office.street ? officeFollowUpEmail(p, office.street, s.left > 0) : followUpEmail(p, s.left > 0);
+    const prev = office.order_id ? await env.DB.prepare('SELECT id, created_at FROM orders WHERE id = ?').bind(office.order_id).first() : null;
+    const t = office.street ? officeFollowUpEmail(p, office.street, s.left > 0, env, prev) : followUpEmail(p, s.left > 0);
     try {
       await sendMail(env, { to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 6 });
       await env.DB.prepare(`UPDATE prospects SET status = 'followed_up', last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), p.email).run();

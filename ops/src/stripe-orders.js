@@ -60,13 +60,15 @@ export async function reconcileStripe(env) {
 }
 
 async function payForProof(env, o, s) {
-  const paidSource = o.source === 'partner-proof' ? 'partner-paid' : 'agent-paid';
+  const md = s.metadata || {};
+  const sampleUpgrade = md.kind === 'sample_upgrade'; // office sample framed for £30: still one of the free samples
+  const paidSource = sampleUpgrade ? 'agent-sample' : o.source === 'partner-proof' ? 'partner-paid' : 'agent-paid';
   const ship = JSON.parse(o.ship_json || '{}');
   const sd = s.collected_information?.shipping_details || s.shipping_details;
   const a = sd?.address;
   const newShip = a?.postal_code ? { ...ship, name: sd.name || ship.name, line1: a.line1, line2: a.line2, city: a.city, county: a.state, postcode: a.postal_code } : ship;
   // Unframed if the checkout says so (agent £39 option) or the amount is the unframed price; otherwise as ordered.
-  const product = s.metadata?.product === 'unframed' || (s.amount_total > 0 && s.amount_total <= 4000) ? 'unframed' : (o.product || 'framed');
+  const product = md.product || ((s.amount_total > 0 && s.amount_total <= 4000) ? 'unframed' : (o.product || 'framed'));
   await updateOrder(env, o.id, { external_ref: s.id, amount_pence: s.amount_total || 0, source: paidSource, status: 'approved', ship_json: JSON.stringify(newShip), product });
   const order = { ...o, ship_json: JSON.stringify(newShip), source: paidSource, product };
   try {
@@ -75,7 +77,8 @@ async function payForProof(env, o, s) {
     await logEvent(env, o.id, 'prodigi_order', { id: po.id, paid: s.amount_total });
     const t = approvedEmail(order);
     await sendMail(env, { to: ship.agent_email || o.email, subject: t.subject, text: t.text, orderId: o.id });
-    await maybeSendAgencyCode(env, ship.agent_email || o.email, o.id);
+    if (sampleUpgrade) await env.DB.prepare(`UPDATE prospects SET status = 'sample_in_progress', samples_used = samples_used + 1, followup_due = NULL WHERE email = ?`).bind(ship.agent_email || o.email).run();
+    else await maybeSendAgencyCode(env, ship.agent_email || o.email, o.id);
   } catch (e) {
     await updateOrder(env, o.id, { status: 'needs_attention', notes: 'Prodigi order failed after payment: ' + e.message });
     await sendMail(env, { to: BRAND.from, bcc: false, subject: `ACTION NEEDED: paid agent order ${o.id} didn't reach Prodigi`, text: e.message });

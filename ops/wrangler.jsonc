@@ -21,7 +21,7 @@
   "vars": {
     "PUBLIC_BASE": "https://housealmanac-ops.reeceegan02.workers.dev",
     "FORWARD_TO": "reeceegan02@gmail.com",
-    "FREE_SAMPLES_CAP": "5",
+    "FREE_SAMPLES_CAP": "9",
     "OUTREACH_WARMUP_PER_DAY": "10",
     "OUTREACH_PER_DAY": "20",
     "OUTREACH_PAUSED": "false",

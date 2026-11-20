@@ -36,7 +36,7 @@ then and now map
 new house present
 map of our street
 
-**Materials:** 200gsm enhanced matte art paper, acrylic glazing
+**Materials:** 308gsm cotton rag art paper (unframed), 200gsm enhanced matte art paper (framed), acrylic glazing
 
 **Description**
 The story of your home, on one A3 print.
@@ -55,7 +55,7 @@ HOW IT WORKS
 3. It's printed and dispatched within 3–5 working days, with free UK delivery. If we get a fact wrong, we reprint it free.
 
 THE DETAILS
-• A3 (29.7 × 42 cm), printed on 200gsm enhanced matte art paper
+• A3 (29.7 × 42 cm). Unframed: heavyweight 308gsm cotton art paper (Hahnemühle Photo Rag), sent rolled in a sturdy tube. Framed: 200gsm enhanced matte art paper
 • Framed option: black classic frame with shatter-resistant acrylic glazing, ready to hang
 • Four colour styles: Heritage (shown), Modern, Midnight and Sage. Tell us which in the personalisation box, or we'll use Heritage.
 • Works for almost any UK address. For brand-new homes, we tell the story of the land before it was built on.

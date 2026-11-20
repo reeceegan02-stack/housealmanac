@@ -1,5 +1,6 @@
 // Prodigi print-on-demand API (v4).
-const SKUS = { framed: 'GLOBAL-CFP-A3', unframed: 'GLOBAL-FAP-A3' };
+// Unframed moved from EMA 200gsm (GLOBAL-FAP-A3) to Hahnemühle Photo Rag 308gsm cotton on 20 Nov 2026: it survives the tube better.
+const SKUS = { framed: 'GLOBAL-CFP-A3', unframed: 'GLOBAL-HPR-A3' };
 
 function base(env) { return env.PRODIGI_BASE || 'https://api.prodigi.com/v4.0'; }
 

@@ -8,7 +8,8 @@ import { sendMail, approvedEmail, firstName } from './mail.js';
 import { createPrintOrder } from './prodigi.js';
 import { stripeGet, stripePost } from './stripe.js';
 import { startOrderWorkflow } from './orders.js';
-import { agentPayLink, AGENT_UNFRAMED, unframedPayLink } from './agents.js';
+import { agentPayLink, AGENT_UNFRAMED, unframedPayLink, frameUpgradeLink } from './agents.js';
+import { sampleIsUnframed, PAPER_UNFRAMED } from './pricing.js';
 
 const FRAMED_LINK = 'https://buy.stripe.com/4gM14p7UJfBSffW9512wU00';
 const IGNORE_FROM = /(no-?reply|do-?not-?reply|mailer-daemon|postmaster|notifications?@|bounce|@stripe\.com|@prodigi\.com|@cloudflare\.com|@etsy\.com|@google\.com|@github\.com)/i;
@@ -254,7 +255,7 @@ async function handleAgentMail(env, prospect, m) {
   const preview = await env.DB.prepare(`SELECT * FROM orders WHERE source = 'agent-preview' AND lower(json_extract(ship_json,'$.agent_domain')) = ? AND status IN ('proof_sent','awaiting_payment','revising','needs_attention') ORDER BY created_at DESC LIMIT 1`).bind(domain0).first();
   const legacy = !preview && JSON.parse(prospect.office_json || '{}').offer === 'buyer_sample'; // emailed before office previews: offered a free framed print for a buyer
   const offer = preview
-    ? `Our first email attached a free digital House Almanac print of their own office street (${preview.address}). ${samples.left > 0 ? 'We offered to frame it and send it to their branch free of charge.' : 'Framed for their branch it is £75 delivered.'} For their buyers: they send a buyer's new address, we email a free proof, and the framed print is £75 delivered to their branch${AGENT_UNFRAMED ? ' (or £39 as an unframed A3 print)' : ''}.`
+    ? `Our first email attached a free digital House Almanac print of their own office street (${preview.address}). ${samples.left > 0 ? (sampleIsUnframed(preview) ? 'We offered to post it to their branch free as an unframed A3 print, or framed and ready to hang for £30 (link in that email).' : 'We offered to frame it and send it to their branch free of charge.') : `For their branch it is £75 framed${AGENT_UNFRAMED ? ' or £39 unframed' : ''}, delivered.`} For their buyers: they send a buyer's new address, we email a free proof, and the framed print is £75 delivered to their branch${AGENT_UNFRAMED ? ' (or £39 as an unframed A3 print)' : ''}.`
     : legacy && samples.left > 0
       ? `We offered this agency one free framed print for a buyer completing with them (${samples.left} free framed samples left in total).`
       : `For their buyers we offer a free digital proof; the framed print is then £75 delivered to their branch${AGENT_UNFRAMED ? ' (or £39 as an unframed A3 print)' : ''}. Don't offer a free framed print.`;
@@ -270,7 +271,8 @@ JSON only:
  "change_request": "for office_print_changes: the exact changes they want to their office print",
  "sample": {"buyer_new_address": "", "completion_date": "", "message_on_print": "", "branch_name": "", "branch_line1": "", "branch_line2": "", "branch_city": "", "branch_postcode": "", "review_url": ""},
  "reply": "reply to send; if they want the sample/proof but details are missing, ask for: buyer's new address, completion date, the message for the print (e.g. 'Welcome home, Sam & Alex, from everyone at <agency>'), the branch delivery address, and optionally their logo (attached) and a link to their Google reviews page for the QR code. Empty if not_interested."}
-"office_print_yes" = they want the framed print of their office (e.g. "yes", "yes please", "we'd love it"). "office_print_changes" = they want changes to the office print first.
+"office_print_yes" = they want the print of their office (e.g. "yes", "yes please", "we'd love it", "unframed please"). "office_print_changes" = they want changes to the office print first.
+Also return "wants_framed": true if they say they want it framed (e.g. "yes, framed please"), else false.
 "sample_with_details" = they sent a buyer's new address with postcode and the branch postcode.` }],
   });
   const c = await parseJson(env, text);
@@ -287,10 +289,19 @@ JSON only:
 
   const reSubject = m.subject.startsWith('Re:') ? m.subject : `Re: ${m.subject}`;
   if (c.intent === 'office_print_yes' && preview && preview.file_key && ['proof_sent', 'needs_attention'].includes(preview.status)) {
+    const unframedSample = sampleIsUnframed(preview);
+    if (samples.left > 0 && unframedSample && c.wants_framed) {
+      // New sample offer: framed costs them £30. Send the link; a plain "yes"/"unframed" later prints it free, unframed.
+      await updateOrder(env, preview.id, { status: 'awaiting_payment' });
+      await sendMail(env, { to: m.from, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac', orderId: preview.id,
+        text: `Hi,\n\nOf course. Framed in black and ready to hang, it's £30 (we cover the rest), here:\n${frameUpgradeLink(env, preview.id)}\n\nAs soon as it's paid it goes to print and arrives at your branch in 3 to 5 working days. Or, if you'd rather have it unframed, just reply "unframed" and I'll post it to you free.\n\nBest wishes,\nReece\nHouse Almanac` });
+      return;
+    }
     if (samples.left > 0) {
-      await updateOrder(env, preview.id, { source: 'agent-sample', status: 'approved' });
+      const product = unframedSample ? 'unframed' : 'framed';
+      await updateOrder(env, preview.id, { source: 'agent-sample', status: 'approved', product });
       try {
-        const po = await createPrintOrder(env, { ...preview, source: 'agent-sample' }, fileUrl(env, preview.file_key));
+        const po = await createPrintOrder(env, { ...preview, source: 'agent-sample', product }, fileUrl(env, preview.file_key));
         await updateOrder(env, preview.id, { status: 'printing', prodigi_id: po.id });
         await logEvent(env, preview.id, 'prodigi_order', { id: po.id, office_sample: true });
       } catch (e) {
@@ -299,13 +310,13 @@ JSON only:
       }
       await env.DB.prepare(`UPDATE prospects SET status = 'sample_in_progress', samples_used = samples_used + 1, last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), prospect.email).run();
       await sendMail(env, { to: m.from, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac', orderId: preview.id,
-        text: `Hi,\n\nLovely, it's gone to print. It will arrive at your branch framed and ready to hang in 3 to 5 working days, and I'll email you the tracking when it ships.\n\nWhen you have a buyer completing, just send me their new address and the message you'd like on it, and I'll email you a free proof of theirs.\n\nBest wishes,\nReece\nHouse Almanac` });
+        text: `Hi,\n\nLovely, it's gone to print. ${unframedSample ? `It's an unframed A3 print on ${PAPER_UNFRAMED}, posted to your branch in a sturdy tube within 3 to 5 working days` : 'It will arrive at your branch framed and ready to hang in 3 to 5 working days'}, and I'll email you the tracking when it ships.\n\nWhen you have a buyer completing, just send me their new address and the message you'd like on it, and I'll email you a free proof of theirs.\n\nBest wishes,\nReece\nHouse Almanac` });
     } else {
       const link = await agentPayLink(env, preview.id, m.from);
       await updateOrder(env, preview.id, { status: 'awaiting_payment' });
       await env.DB.prepare(`UPDATE prospects SET status = 'interested', last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), prospect.email).run();
       await sendMail(env, { to: m.from, subject: reSubject, fromName: 'Reece Egan-Sheath | House Almanac', orderId: preview.id,
-        text: `Hi,\n\nGreat. Framed and delivered to your branch it's £75, here (card, Apple Pay or Google Pay):\n${link}\n\nAs soon as it's paid it goes to print and arrives in 3 to 5 working days.\n\nBest wishes,\nReece\nHouse Almanac` });
+        text: `Hi,\n\nGreat. Framed and delivered to your branch it's £75, here (card, Apple Pay or Google Pay):\n${link}\n${AGENT_UNFRAMED ? `\nOr as an unframed A3 print on heavyweight cotton paper it's £39, here:\n${unframedPayLink(env, preview.id)}\n` : ''}\nAs soon as it's paid it goes to print and arrives in 3 to 5 working days.\n\nBest wishes,\nReece\nHouse Almanac` });
       await overCapAlert(env, prospect.agency);
     }
     return;
@@ -366,7 +377,7 @@ async function overCapAlert(env, agency) {
   if (n % 3 !== 0) return;
   await sendMail(env, {
     to: BRAND.from, bcc: false, subject: `Decision: ${n} agencies wanted samples after the free ones ran out`,
-    text: `The latest was ${agency}. Since the free framed samples ran out, ${n} agencies have asked for one; each got a free digital proof and the option to buy the framed print at £75.\n\nEach extra free framed sample costs £51.30. If you'd like to fund more, tell Claude how many (e.g. "approve 5 more samples").`,
+    text: `The latest was ${agency}. Since the free samples ran out, ${n} agencies have asked for one; each got a free digital proof and the option to buy the print (£75 framed or £39 unframed).\n\nEach extra free sample costs about £21.66 (unframed; framed ones cost us the same after their £30). If you'd like to fund more, tell Claude how many (e.g. "approve 5 more samples").`,
   });
 }
 

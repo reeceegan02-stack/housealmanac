@@ -27,26 +27,29 @@ Standing approvals from Reece (9 Nov 2026): "full control" of marketing, orders,
 ## Products and prices (incl. free UK delivery; not VAT-registered)
 | Product | Price | Prodigi SKU | Prodigi cost incl. VAT + delivery |
 |---|---|---|---|
-| Unframed A3 | £39 | GLOBAL-FAP-A3 (EMA 200gsm) | £15.66 (£7 + £6.05 Evri next day + VAT; Prodigi quote 20 Nov) |
+| Unframed A3 | £39 | GLOBAL-HPR-A3 (Hahnemühle Photo Rag 308gsm cotton, from 20 Nov; was FAP EMA 200gsm) | £21.66 (£12 + £6.05 Evri next day + VAT; Prodigi quote 20 Nov) |
 | Framed A3, black classic | £89 | GLOBAL-CFP-A3 (no mount, acrylic) | £51.66 (£32 + £11.05 DPD + VAT; Prodigi quote 20 Nov) |
 | Estate agent completion gift | £75, then £65 (code AGENCY10 after first paid order) | as above | never below £65; always paid up front |
 Stripe payment links: framed https://buy.stripe.com/4gM14p7UJfBSffW9512wU00 · unframed https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01
 Christmas: last order date 9 December (site banner switches to vouchers after that, and hides after 25 Dec).
 Gift vouchers (9 Nov): framed £89 https://buy.stripe.com/28EcN74IxdtKebS2GD2wU03 · unframed £39 https://buy.stripe.com/6oUdRb0shfBSffW1Cz2wU04
 (pages /gift and /redeem). Frame colour: black by default; white or natural on request (inbox stores ship_json.frame_colour, Prodigi gets it).
-Unframed A3 ships ROLLED in a cardboard tube via Evri (Prodigi help article); Reece's test print arrived creased. 20 Nov: asked
-support@prodigi.com about flat/board-backed shipping and how GLOBAL-PAP-A3 / GLOBAL-HPR-A3 (Hahnemühle Photo Rag 308gsm, £21.66 delivered) ship;
-replies are logged as events kind supplier_mail (inbox never answers @prodigi mail). Alternatives priced 20 Nov: PAP £15.66, HPR/HGE £21.66, BLP poster £12.06.
-**Unframed option for estate agents: BUILT, switched off** (Reece's idea; he said yes to £39 on 20 Nov; profit £23.34, same as framed at £75).
-Switch: AGENT_UNFRAMED in ops/src/pricing.js (false). When true: agent emails/kb/proof text offer "£75 framed or £39 unframed"; the approve
-reply carries both links; /pay/<order>/unframed creates a fresh £39 Stripe Checkout (client_reference_id + metadata product=unframed; fallback:
-public £39 link); payForProof prints unframed when metadata says so or amount <= £40. Tested 20 Nov (session created for a real preview, unpaid).
-Free office samples stay framed. Still to do when switching on: site/agents.html price row. **Only blocker: packaging** (Prodigi reply due;
-follow-up 23 Nov). Stripe restricted key "House Almanac ops" (rk_live…R4Pw) got Checkout Sessions: Write + Payment Links: Write on 20 Nov
-(Reece signed into the House Almanac Stripe login in Chrome and asked me to do it). Payment links' after-payment page is still Stripe's own
-confirmation: switching to /thanks redirects (POST /admin/stripe/link-redirects) would also fire the "Purchase" tag, so make that action
-secondary first to avoid double counting with the import route.
+Unframed A3 ships ROLLED in a cardboard tube via Evri (no flat option at A3). Reece (20 Nov): "it didn't come out too bad", move to thicker
+paper and offer unframed to agents. From 20 Nov ALL unframed (site, vouchers, Etsy, agents) prints on GLOBAL-HPR-A3; copy says "heavyweight
+308gsm cotton art paper (Hahnemühle Photo Rag), sent rolled in a sturdy tube". Prodigi support was asked about flat shipping (supplier_mail events).
+**Agent unframed option LIVE 20 Nov** (Reece said yes to £39; AGENT_UNFRAMED=true in ops/src/pricing.js): profit £17.34 on Photo Rag
+(framed £75 → £23.34). Approve reply carries both links; /pay/<order>/unframed creates a fresh £39 Stripe Checkout (metadata product=unframed);
+payForProof uses metadata.product (amount <= £40 only as fallback). agents.html shows both prices.
+**Free office samples from 20 Nov 17:00 UTC** (pricing.js SAMPLE_SWITCH_AT; previews created earlier keep the free framed offer): unframed and
+free, or framed for £30 via /pay/<preview>/framed (Stripe Checkout, metadata kind=sample_upgrade → source agent-sample, counts as a sample,
+no AGENCY10, not a "paying agency"). "yes, framed" replies get the £30 link; plain "yes"/"unframed" prints unframed free.
+Sample cap: Reece 20 Nov 16:33 "increase in samples approved" → FREE_SAMPLES_CAP 9 (2 framed used + 7 unframed ≈ £152, the money that
+was earmarked for 3 more framed), plus 1 per paying agency as before.
+Stripe restricted key "House Almanac ops" (rk_live…R4Pw) has Checkout Sessions: Write + Payment Links: Write since 20 Nov (Reece signed in to the
+House Almanac Stripe login in Chrome and asked me to do it). Payment links still use Stripe's own confirmation page; switching to /thanks
+redirects (POST /admin/stripe/link-redirects) would also fire the "Purchase" tag, so make that action secondary first (double counting).
 Fixed 20 Nov: office-preview orders (external_ref 'preview-<email>') are treated as unpaid when an agency pays for them.
+Etsy live listings still say 200gsm EMA for unframed until updated in Chrome (copy in marketing/etsy_listing.md).
 
 ## Systems
 - Website: `site/` → Cloudflare Worker `housealmanac-web` (static assets), custom domains housealmanac.co.uk + www.
@@ -169,5 +172,5 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - `ops/` cloud operations worker · `site/` website · `pipeline/` print templates and render scripts · `marketing/` mockups, Etsy listing, ad copy · `business/` pricing model, ledger, prospects.
 
 ## Budget tracker (£2,000 all-in, from 9 Nov 2026)
-Spent to 19 Nov: £148.46 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency samples 1-2 £102.60, Etsy fees £2.98, 5 extra Etsy listings £0.80), plus Google Ads £5.47 to 19 Nov 11:00 (billed later to Reece's bank; log the invoice). Approved, not yet bought: Claude credit top-up $100 (~£95) when it's nearly used up (check scheduled 25 Nov). Committed: 3 more free framed samples × £51.30; Etsy Ads up to ~£65 (Reece said yes 9 Nov: £4/day, 24 Nov–9 Dec, Etsy's new-shop wait ends 24 Nov; scheduled reminders switch it on 24 Nov and off 9 Dec); Google Ads up to £280 (campaign total cap, Reece agreed max £300 on 18 Nov; spend is billed to his bank, log it from Billing → Summary).
+Spent to 19 Nov: £148.46 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency samples 1-2 £102.60, Etsy fees £2.98, 5 extra Etsy listings £0.80), plus Google Ads £5.47 to 19 Nov 11:00 (billed later to Reece's bank; log the invoice). Approved, not yet bought: Claude credit top-up $100 (~£95) when it's nearly used up (check scheduled 25 Nov). Committed: 7 more free unframed samples × £21.66 (Reece approved the increase 20 Nov); Etsy Ads up to ~£65 (Reece said yes 9 Nov: £4/day, 24 Nov–9 Dec, Etsy's new-shop wait ends 24 Nov; scheduled reminders switch it on 24 Nov and off 9 Dec); Google Ads up to £280 (campaign total cap, Reece agreed max £300 on 18 Nov; spend is billed to his bank, log it from Billing → Summary).
 Keep this line current; the weekly growth agent recomputes it from business/ledger.csv.
