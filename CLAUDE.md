@@ -27,13 +27,19 @@ Standing approvals from Reece (9 Nov 2026): "full control" of marketing, orders,
 ## Products and prices (incl. free UK delivery; not VAT-registered)
 | Product | Price | Prodigi SKU | Prodigi cost incl. VAT + delivery |
 |---|---|---|---|
-| Unframed A3 | £39 | GLOBAL-FAP-A3 (EMA 200gsm) | £15.48 (£7 + £5.90 Evri next day + VAT) |
-| Framed A3, black classic | £89 | GLOBAL-CFP-A3 (no mount, acrylic) | £51.30 (£32 + £10.75 + VAT) |
+| Unframed A3 | £39 | GLOBAL-FAP-A3 (EMA 200gsm) | £15.66 (£7 + £6.05 Evri next day + VAT; Prodigi quote 20 Nov) |
+| Framed A3, black classic | £89 | GLOBAL-CFP-A3 (no mount, acrylic) | £51.66 (£32 + £11.05 DPD + VAT; Prodigi quote 20 Nov) |
 | Estate agent completion gift | £75, then £65 (code AGENCY10 after first paid order) | as above | never below £65; always paid up front |
 Stripe payment links: framed https://buy.stripe.com/4gM14p7UJfBSffW9512wU00 · unframed https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01
 Christmas: last order date 9 December (site banner switches to vouchers after that, and hides after 25 Dec).
 Gift vouchers (9 Nov): framed £89 https://buy.stripe.com/28EcN74IxdtKebS2GD2wU03 · unframed £39 https://buy.stripe.com/6oUdRb0shfBSffW1Cz2wU04
 (pages /gift and /redeem). Frame colour: black by default; white or natural on request (inbox stores ship_json.frame_colour, Prodigi gets it).
+Unframed A3 ships ROLLED in a cardboard tube via Evri (Prodigi help article); Reece's test print arrived creased. 20 Nov: asked
+support@prodigi.com about flat/board-backed shipping and how GLOBAL-PAP-A3 / GLOBAL-HPR-A3 (Hahnemühle Photo Rag 308gsm, £21.66 delivered) ship;
+replies are logged as events kind supplier_mail (inbox never answers @prodigi mail). Alternatives priced 20 Nov: PAP £15.66, HPR/HGE £21.66, BLP poster £12.06.
+**Planned: unframed option for estate agents** (Reece's idea, 20 Nov): proposed £39 (profit £23.34, same as framed at £75); waiting on packaging fix,
+Reece's yes to the price, and Stripe key permissions (Checkout Sessions: Write + Payment Links: Write) so each proof gets per-order checkouts
+(test: POST /admin/stripe/session-test). Free office samples stay framed. Follow-up scheduled 23 Nov. Admin: POST /admin/prodigi/quote {skus}.
 
 ## Systems
 - Website: `site/` → Cloudflare Worker `housealmanac-web` (static assets), custom domains housealmanac.co.uk + www.
