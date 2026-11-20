@@ -54,6 +54,11 @@ async function handleExternal(env, message, mail, from, subject, forward, wasFor
     await handleBounce(env, (mail.text || htmlToText(mail.html || '')).toLowerCase(), subject);
     return;
   }
+  // Supplier mail (Prodigi support replies, notices): never answered automatically; kept readable via /admin/events?kind=supplier_mail.
+  if (/prodigi|freshdesk/i.test(from)) {
+    await logEvent(env, null, 'supplier_mail', { from, subject, body: body.slice(0, 4000) });
+    return;
+  }
   if (IGNORE_FROM.test(from) || (autoSubmitted && autoSubmitted !== 'no') || /bulk|list|junk/.test(precedence)) {
     await logEvent(env, null, 'inbox_ignored', { from, subject });
     return;

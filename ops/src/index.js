@@ -139,7 +139,11 @@ async function admin(req, env, url) {
     return json(results);
   }
   if (p === '/prospects') return json((await env.DB.prepare('SELECT * FROM prospects ORDER BY agency').all()).results);
-  if (p === '/events') return json((await env.DB.prepare('SELECT * FROM events ORDER BY id DESC LIMIT ?').bind(Number(url.searchParams.get('limit') || 50)).all()).results);
+  if (p === '/events') {
+    const kind = url.searchParams.get('kind'), lim = Number(url.searchParams.get('limit') || 50);
+    return json((kind ? await env.DB.prepare('SELECT * FROM events WHERE kind = ? ORDER BY id DESC LIMIT ?').bind(kind, lim).all()
+      : await env.DB.prepare('SELECT * FROM events ORDER BY id DESC LIMIT ?').bind(lim).all()).results);
+  }
   if (p === '/send' && req.method === 'POST') return json(await sendMail(env, body));
   if (p === '/summary' && req.method === 'POST') { const r = await weeklySummary(env, { dry: !!body.dry }); return json(r || { ok: true }); }
   if (p === '/etsy/poll' && req.method === 'POST') return json(await pollEtsy(env));
