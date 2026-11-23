@@ -54,7 +54,9 @@ House Almanac · hello@housealmanac.co.uk`,
 const CONSUMER_UNFRAMED_LINK = 'https://buy.stripe.com/00waEZ1wlblC5Fm3KH2wU01';
 
 // Emails carry this stable link; clicking it creates a fresh Stripe Checkout (sessions expire, emails don't).
-export function unframedPayLink(env, orderId) { return `${env.PUBLIC_BASE}/pay/${orderId}/unframed`; }
+// Pay links go out on our own domain (site/_redirects forwards /pay/* to this worker), so agents see housealmanac.co.uk.
+export const PAY_BASE = 'https://housealmanac.co.uk';
+export function unframedPayLink(env, orderId) { return `${PAY_BASE}/pay/${orderId}/unframed`; }
 
 function page(title, msg, status = 200) {
   return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — House Almanac</title><body style="margin:0;background:#f6f1e7;color:#2a241e;font:17px/1.6 system-ui,sans-serif"><main style="max-width:560px;margin:0 auto;padding:60px 20px"><p style="font:700 20px Georgia,serif">House Almanac</p><h1 style="font:700 30px Georgia,serif">${title}</h1><p>${msg}</p></main>`,
@@ -96,7 +98,7 @@ export async function payUnframed(env, id) {
 
 // Office sample framed for £30 (we cover the rest). Stable link in emails → fresh Stripe Checkout. If the free samples
 // have run out it falls back to the normal £75 agent link.
-export function frameUpgradeLink(env, orderId) { return `${env.PUBLIC_BASE}/pay/${orderId}/framed`; }
+export function frameUpgradeLink(env, orderId) { return `${PAY_BASE}/pay/${orderId}/framed`; }
 
 export async function payFramedSample(env, id) {
   const o = await getOrder(env, id);

@@ -52,9 +52,9 @@ export function firstEmail(p, offerSample) {
     subject: `A completion gift for ${p.agency} buyers`,
     text: `Hi ${p.agency} team,
 
-I run House Almanac, a Manchester business that makes framed A3 prints of a home's history: the street on a historic Ordnance Survey map, the same spot today, a short history and timeline, and a message from you.
+I run House Almanac, a Manchester business that makes A3 prints of a home's history, framed or unframed: the street on a historic Ordnance Survey map, the same spot today, a short history and timeline, and a message from you.
 
-For agents, each print carries your logo and a QR code to your review page, and arrives framed at your branch ready for key handover. It's ${AGENT_PRICES}.
+For agents, each print carries your logo and a QR code to your review page, and arrives at your branch ready for key handover. It's ${AGENT_PRICES}.
 
 There's an example and the details here: https://housealmanac.co.uk/agents
 
@@ -68,6 +68,8 @@ If this isn't for you, reply "no thanks" and I won't email again.`,
   };
 }
 
+// offerSample: only for agencies first emailed before 16:00 9 Nov, whose intro offered a free framed print for a buyer
+// (office_json.offer = 'buyer_sample'). Everyone else was offered a free proof, so that's what the follow-up repeats.
 export function followUpEmail(p, offerSample) {
   const offer = offerSample
     ? `The offer of a free framed print for one of your buyers still stands. Reply with their new address and I'll send you a proof within 2 working days.`
@@ -78,7 +80,7 @@ export function followUpEmail(p, offerSample) {
 
 Just bringing this back to the top of your inbox. ${offer}
 
-Example and prices: https://housealmanac.co.uk/agents
+Prices: ${AGENT_PRICES}. Example and details: https://housealmanac.co.uk/agents
 
 Reece
 House Almanac · hello@housealmanac.co.uk
@@ -91,7 +93,7 @@ If this isn't for you, reply "no thanks" and I won't email again.`,
 // What we offer for the agency's own office print. order = the preview order (decides old vs new sample offer).
 function officeOffer(env, order, offerFree, short = false) {
   if (offerFree && order && sampleIsUnframed(order)) {
-    const link = `${env.PUBLIC_BASE}/pay/${order.id}/framed`;
+    const link = `https://housealmanac.co.uk/pay/${order.id}/framed`; // forwarded to the ops worker by site/_redirects
     return short
       ? `If you'd like it for the branch, reply "yes" and I'll post it free as an unframed A3 print, or have it framed and ready to hang for £30: ${link}`
       : `If you'd like it for the branch, just reply "yes" and I'll post it to you free as an unframed A3 print on ${PAPER_UNFRAMED}. Or, if you'd rather have it framed in black and ready to hang, it's £30 (we cover the rest): ${link}`;
@@ -132,7 +134,7 @@ export function officeFollowUpEmail(p, street, offerFree, env, order) {
 
 Just checking the print of ${street} reached you (it was in my last email). ${officeOffer(env, order, offerFree, true)}
 
-And if you have a buyer completing soon, send me their new address and I'll email you a free proof of their print.
+And if you have a buyer completing soon, send me their new address and I'll email you a free proof of their print (then it's ${AGENT_UNFRAMED ? '£75 framed or £39 unframed' : '£75'}, paid per print).
 
 Reece
 House Almanac · hello@housealmanac.co.uk
@@ -284,7 +286,7 @@ export async function sendFollowUps(env) {
   for (const p of results) {
     const office = JSON.parse(p.office_json || '{}');
     const prev = office.order_id ? await env.DB.prepare('SELECT id, created_at FROM orders WHERE id = ?').bind(office.order_id).first() : null;
-    const t = office.street ? officeFollowUpEmail(p, office.street, s.left > 0, env, prev) : followUpEmail(p, s.left > 0);
+    const t = office.street ? officeFollowUpEmail(p, office.street, s.left > 0, env, prev) : followUpEmail(p, s.left > 0 && office.offer === 'buyer_sample');
     try {
       await sendMail(env, { to: p.email, subject: t.subject, text: t.text, fromName: 'Reece Egan-Sheath | House Almanac', dedupeDays: 6 });
       await env.DB.prepare(`UPDATE prospects SET status = 'followed_up', last_contact = ?, followup_due = NULL WHERE email = ?`).bind(now(), p.email).run();

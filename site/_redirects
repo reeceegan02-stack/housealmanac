@@ -1,0 +1,2 @@
+# Pay links in agent emails use our own domain; the ops worker creates the Stripe Checkout.
+/pay/* https://housealmanac-ops.reeceegan02.workers.dev/pay/:splat 302
