@@ -14,6 +14,10 @@ Standing approvals from Reece (9 Nov 2026): "full control" of marketing, orders,
   (1) any charge to his card — show item + total for a one-word yes (a hard rule), batching where possible; (2) things only he can do
   (creating accounts, entering card/ID/keys). Track spend vs the £2,000 in business/ledger.csv (budget line at the bottom of this file).
 
+**Focus (Reece, 23 Nov 2026): "focus on estate agents not all this other stuff".** Agents are the only growth channel. Google Ads campaign
+paused 23 Nov (£36.87 spent, 47 clicks, 0 sales); Etsy Ads NOT started (the 24 Nov switch-on was cancelled). Website, Etsy listings and
+vouchers stay up and take orders, with no paid promotion. Don't email Reece FYIs; the weekly update is his one regular email.
+
 ## Rules that always apply
 - Never enter passwords, card/bank details or ID, never create accounts — Reece does those.
 - Any purchase: tell Reece the item and total and get a yes first. Anything over £50 needs a separate yes.
@@ -156,9 +160,10 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - **In-worker agents** (`ops/src/agent.js`, Workflow `housealmanac-agents`, Claude API with bounded tools; run in Cloudflare, no laptop):
   - Daily ops agent 07:00 UTC: reads the snapshot; can restart stuck orders, pause/resume outreach (kv agent_outreach_paused),
     and email Reece only when he must act (once per run).
-  - Weekly growth agent Mondays 07:00 UTC: can set outreach per-day (kv agent_outreach_per_day, 0-40) and queue up to 15 pitches
-    (press, gift guides, bloggers, partners) into D1 `outbox_queue` (with source URL); `ops/src/outbox.js` sends them weekdays 9-17 UK,
-    max OUTBOX_PER_DAY, never twice to one address, honouring opt-outs. Their notes appear in the snapshot (`agents`).
+  - Weekly growth agent Mondays 07:00 UTC: estate agents only. Sets outreach per-day (kv agent_outreach_per_day, 0-40) and writes a
+    short funnel note that goes into the weekly update. No web search, no pitches, no emails to Reece (since 23 Nov).
+    Press/gift-guide/blogger/partner pitches are OFF (outbox.js PITCHES_ON=false; anything still queued is cancelled): 32 went out 13-23 Nov.
+    Pitch text under 200 chars or "undefined" is rejected (one went out blank to a conveyancer on 23 Nov). Notes appear in the snapshot (`agents`).
   - Admin: POST /admin/agent/run {agent: ops|growth}, GET /admin/outbox.
 - Code fixes still need a Claude Code session (scheduled cloud sessions were blocked by a permission check on 9 Nov; Reece can enable one).
   Such a session reads the `ops-status` issue (only GitHub is reachable), fixes code, pushes. `ops/outbox.json` is a code-level outbox too.
@@ -172,5 +177,5 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - `ops/` cloud operations worker · `site/` website · `pipeline/` print templates and render scripts · `marketing/` mockups, Etsy listing, ad copy · `business/` pricing model, ledger, prospects.
 
 ## Budget tracker (£2,000 all-in, from 9 Nov 2026)
-Spent to 19 Nov: £148.46 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency samples 1-2 £102.60, Etsy fees £2.98, 5 extra Etsy listings £0.80), plus Google Ads £19.57 to 21 Nov 07:48 (367 impressions, 25 clicks, CTR 6.8%, avg CPC £0.78, 0 sales yet; billed later to Reece's bank: log the invoice in the ledger when it arrives). Approved, not yet bought: Claude credit top-up $100 (~£95) when it's nearly used up (check scheduled 25 Nov). Committed: 7 more free unframed samples × £21.66 (Reece approved the increase 20 Nov); Etsy Ads up to ~£65 (Reece said yes 9 Nov: £4/day, 24 Nov–9 Dec, Etsy's new-shop wait ends 24 Nov; scheduled reminders switch it on 24 Nov and off 9 Dec); Google Ads up to £280 (campaign total cap, Reece agreed max £300 on 18 Nov; spend is billed to his bank, log it from Billing → Summary).
+Spent to 19 Nov: £148.46 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency samples 1-2 £102.60, Etsy fees £2.98, 5 extra Etsy listings £0.80), plus Google Ads £36.87 to 23 Nov, then paused (687 impressions, 47 clicks, 0 sales; billed later to Reece's bank: log the invoice in the ledger when it arrives). Approved, not yet bought: Claude credit top-up $100 (~£95) when it's nearly used up (check scheduled 25 Nov). Committed: 7 more free unframed samples × £21.66 (Reece approved the increase 20 Nov); Etsy Ads (~£65) cancelled 23 Nov (agent focus). Google Ads paused 23 Nov; the £280 cap stays in place if it is ever re-enabled (spend is billed to his bank, log it from Billing → Summary).
 Keep this line current; the weekly growth agent recomputes it from business/ledger.csv.

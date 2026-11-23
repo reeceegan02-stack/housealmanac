@@ -70,7 +70,7 @@ export class OrderWorkflow extends WorkflowEntrypoint {
 
     const qa = await step.do(`check v${rev}`, R(2), async () => {
       const proof = await env.FILES.get(rendered.proofKey, 'arrayBuffer');
-      return checkProof(env, new Uint8Array(proof), data, message, rendered);
+      return checkProof(env, new Uint8Array(proof), data, message, rendered, ['agent-preview', 'etsy'].includes(order.source) && rev === 0);
     });
     await logEvent(env, order.id, 'qa', { qa, rendered: { ...rendered, fileKey: undefined, proofKey: undefined }, layer: nls.layer });
 
@@ -130,33 +130,39 @@ export class OrderWorkflow extends WorkflowEntrypoint {
 }
 
 // Vision check of the proof before it goes to the customer.
-export async function checkProof(env, proofBytes, data, message, rendered) {
+export async function checkProof(env, proofBytes, data, message, rendered, strict = false) {
   const blocking = [];
   if (rendered.images.broken > Math.max(2, rendered.images.total * 0.05)) blocking.push(`${rendered.images.broken} of ${rendered.images.total} map tiles failed to load`);
   if (rendered.osmFailed > rendered.osmCount * 0.2) blocking.push(`today's map: ${rendered.osmFailed} of ${rendered.osmCount} tiles failed`);
   if (rendered.fit && rendered.fit.story < 0.8) blocking.push('story text had to shrink a lot to fit');
-  let review = { ok: true, blocking_issues: [], minor_issues: [] };
-  try {
-    const { text } = await claude(env, {
-      model: MODELS.research, maxTokens: 800,
-      messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: bytesToBase64(proofBytes) } },
-        { type: 'text', text: `This is a low-resolution proof of a personalised A3 house-history print (the diagonal "PROOF" mark is expected).
+  // The vision reply occasionally has no JSON (about 7% of checks up to 23 Nov), and those proofs went out unchecked.
+  // Now: try twice; if it is still unavailable, `strict` callers (agent office previews, Etsy orders printed without a
+  // customer proof) treat that as blocking.
+  let review = null, lastErr = '';
+  for (let attempt = 0; attempt < 2 && !review; attempt++) {
+    try {
+      const { text } = await claude(env, {
+        model: MODELS.research, maxTokens: 800,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: bytesToBase64(proofBytes) } },
+          { type: 'text', text: `This is a low-resolution proof of a personalised A3 house-history print (the diagonal "PROOF" mark is expected).
 Check only for problems that would embarrass us if printed:
 1. Is the large top map a historic map with visible streets and buildings (not blank, grey or missing)?
 2. Is the smaller "today" map showing a street map (not blank)?
 3. Is any text cut off, overlapping other elements, or running outside its box?
 4. Does the title read "${data.title}" and does the message box read: "${message}"?
 5. Any obvious spelling mistakes in large text?
-Reply with JSON only: {"ok": true|false, "blocking_issues": ["..."], "minor_issues": ["..."]}. ok=false only for real, visible problems.` },
-      ] }],
-    });
-    review = extractJson(text);
-  } catch (e) {
-    review.minor_issues = ['vision check unavailable: ' + e.message];
+Reply with JSON only: {"ok": true|false, "blocking_issues": ["..."], "minor_issues": ["..."]}. ok=false only for real, visible problems.${attempt ? '\nYour reply must be that JSON object and nothing else.' : ''}` },
+        ] }],
+      });
+      review = extractJson(text);
+    } catch (e) { lastErr = e.message; }
   }
+  const vision = !!review;
+  if (!review) review = { blocking_issues: [], minor_issues: ['vision check unavailable: ' + lastErr] };
+  if (!vision && strict) blocking.push('vision check unavailable: ' + lastErr);
   blocking.push(...(review.blocking_issues || []));
-  return { ok: blocking.length === 0, blocking, minor: review.minor_issues || [] };
+  return { ok: blocking.length === 0, blocking, minor: review.minor_issues || [], vision };
 }
 
 // Branding for estate-agent orders: their logo (if they've sent one) and a QR code to their reviews.

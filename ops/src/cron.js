@@ -142,8 +142,6 @@ export async function weeklySummary(env, { dry = false } = {}) {
   const st = Object.fromEntries(prospects.map(r => [r.status, r.n]));
   const replies = await all(`SELECT json_extract(detail, '$.intent') intent, count(*) n FROM events WHERE kind = 'agent_mail' AND at >= ? GROUP BY intent`, since);
   const samples = await samplesStatus(env);
-  const pitches = (await one(`SELECT count(*) n FROM outbox_queue WHERE status = 'sent' AND sent_at >= ?`, since).catch(() => ({ n: 0 }))).n;
-  const pitchReplies = (await one(`SELECT count(*) n FROM events WHERE kind = 'general_mail' AND at >= ? AND coalesce(json_extract(detail, '$.intent'), '') NOT IN ('supplier_or_sales_pitch', 'spam')`, since)).n;
   const growth = await one(`SELECT detail FROM events WHERE kind = 'agent_growth' ORDER BY id DESC LIMIT 1`);
   let growthNote = ''; try { growthNote = JSON.parse(growth?.detail || '{}').final || ''; } catch {}
   const ads = await adsSummary(env).catch(() => ({ connected: false }));
@@ -166,12 +164,8 @@ Prints sent to the printer: ${printed.reduce((a, r) => a + r.n, 0)} (about £${p
 Estate agents: ${newAgencies} new agencies emailed and ${followUps} follow-ups this week; ${total} contacted in total.
 Replies this week: ${replies.map(r => `${r.n} ${String(r.intent || 'other').replace(/_/g, ' ')}`).join(', ') || 'none'}.
 Interested so far: ${st.interested || 0}. Free office samples sent: ${samples.used} of ${samples.cap}. Paying agencies: ${samples.paying}.
-
-Press, gift guides and partners: ${pitches} pitches sent this week, ${pitchReplies} repl${pitchReplies === 1 ? 'y' : 'ies'}.
-
-Google Ads: ${ads.connected ? `£${ads.last_7d.spend.toFixed(2)} spent this week (${ads.last_7d.clicks} clicks, ${ads.last_7d.conversions} sales tracked); £${ads.total.spend.toFixed(2)} of the £${ads.cap_gbp} cap so far.` : 'monitor not reporting yet.'}
-
-${growthNote ? `Plan for this week:\n${growthNote.replace(/\*\*/g, '').slice(0, 1200)}\n\n` : ''}Running costs: Claude API about $${(promoUsd + paidUsd).toFixed(0)} used ($${promoUsd.toFixed(0)} of the free $100 until 24 Nov, then $${paidUsd.toFixed(0)} of $${PREPAID_USD} prepaid).
+${ads.connected && ads.last_7d?.spend > 0.5 ? `\nGoogle Ads (paused 23 Nov to focus on agents): £${ads.last_7d.spend.toFixed(2)} spent this week, ${ads.last_7d.conversions} sales tracked.\n` : ''}
+${growthNote ? `Agent plan for this week:\n${growthNote.replace(/\*\*/g, '').slice(0, 1200)}\n\n` : ''}Running costs: Claude API about $${(promoUsd + paidUsd).toFixed(0)} used ($${promoUsd.toFixed(0)} of the free $100 until 24 Nov, then $${paidUsd.toFixed(0)} of $${PREPAID_USD} prepaid).
 
 ${needs.length ? `Needs you:\n${needs.map(n => `- ${n}`).join('\n')}` : 'Nothing needs you this week.'}
 

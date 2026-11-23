@@ -5,6 +5,9 @@ import { kvGet, kvSet, logEvent } from './util.js';
 import { sendMail } from './mail.js';
 import { outreachPaused } from './controls.js';
 
+// Press / gift-guide / blogger / partner pitches: off (Reece, 23 Nov 2026: "focus on estate agents not all this other stuff").
+const PITCHES_ON = false;
+
 const ukHour = () => Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }).format(new Date()));
 
 export async function sendOutbox(env) {
@@ -34,10 +37,16 @@ export async function sendOutbox(env) {
       await logEvent(env, null, 'outbox_sent', { id: it.id, kind: it.kind || 'other' });
     }
   }
-  // Then pitches the growth agent queued in D1.
+  // Then pitches the growth agent queued in D1. Off since 23 Nov 2026 (Reece: focus on estate agents only).
+  if (!PITCHES_ON) {
+    await env.DB.prepare(`UPDATE outbox_queue SET status = 'cancelled' WHERE status = 'queued'`).run().catch(() => {});
+    return { sent, pitches: 'off' };
+  }
   const { results: queued } = await env.DB.prepare(`SELECT * FROM outbox_queue WHERE status = 'queued' ORDER BY created_at LIMIT 10`).all();
   for (const q of queued) {
     if (sentToday >= perDay || sent >= 4) break;
+    const body = String(q.text ?? '').trim();
+    if (body.length < 200 || /^(undefined|null)$/i.test(body)) { await env.DB.prepare(`UPDATE outbox_queue SET status = 'invalid' WHERE id = ?`).bind(q.id).run(); continue; }
     const blocked = await env.DB.prepare(`SELECT 1 FROM prospects WHERE email = ? AND status IN ('opted_out','bounced')`).bind(q.to_email).first()
       || await kvGet(env, 'suppress_' + q.to_email)
       || await env.DB.prepare(`SELECT 1 FROM outbox_queue WHERE to_email = ? AND status = 'sent'`).bind(q.to_email).first();

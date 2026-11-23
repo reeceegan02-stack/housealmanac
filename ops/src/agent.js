@@ -1,8 +1,9 @@
 // AI agents that run the business from inside Cloudflare (no laptop, no chat session needed):
 //  - Daily operations agent (07:00 UTC): reads the status snapshot, restarts stuck orders, pauses/resumes or
 //    re-paces outreach, and emails Reece only when something needs him.
-//  - Weekly growth agent (Mondays 09:00 UTC): reviews the week, adjusts outreach volume, and finds press,
-//    gift-guide and partner contacts, writing pitches into the outbox queue (sent gradually by outbox.js).
+//  - Weekly growth agent (Mondays 07:00 UTC): reviews the estate-agent funnel and sets outreach volume.
+//    Since 23 Nov 2026 (Reece: "focus on estate agents not all this other stuff") it no longer pitches press,
+//    gift guides, bloggers or partners, and it doesn't email Reece (its plan goes into the weekly update).
 // Both use a small set of tightly bounded tools. Code changes are out of scope for them (a Claude Code session
 // does those via GitHub).
 import { WorkflowEntrypoint } from 'cloudflare:workers';
@@ -74,6 +75,8 @@ const TOOLS = {
         source_url: { type: 'string', description: 'Page where you found the address' } }, required: ['to', 'name_or_outlet', 'kind', 'subject', 'text', 'source_url'] } },
     async run(env, a, ctx) {
       if ((ctx.queued = (ctx.queued || 0) + 1) > 15) return 'Limit of 15 pitches per run reached.';
+      const body = String(a.text ?? '').trim();
+      if (body.length < 200 || /^(undefined|null)$/i.test(body)) return 'Rejected: the pitch text is missing or too short. Pass the full email body in "text".';
       const to = String(a.to).trim().toLowerCase();
       if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(to) || /@(gmail|hotmail|outlook|yahoo|icloud)\./.test(to)) return 'Rejected: not a published business address.';
       if (await env.DB.prepare('SELECT 1 FROM outbox_queue WHERE to_email = ?').bind(to).first()) return 'Already contacted before; skipped.';
@@ -108,7 +111,7 @@ async function runAgent(env, { system, prompt, tools, serverTools = [], maxTurns
   return { final: '(stopped after max turns)', log };
 }
 
-const RULES = `Rules: you act for House Almanac (personalised A3 house-history prints, Manchester; owner Reece Egan-Sheath, who has given full control within a £2,000 all-in budget and does not want to be asked about day-to-day matters). Never spend money or promise discounts beyond the published prices; never mislead; never invent facts, reviews or results; be brief.
+const RULES = `Rules: you act for House Almanac (personalised A3 house-history prints, Manchester; owner Reece Egan-Sheath, who has given full control within a £2,000 all-in budget and does not want to be asked about day-to-day matters). Focus (Reece, 23 Nov 2026): estate agents only; no press, gift-guide, blogger or partner pitches. Never spend money or promise discounts beyond the published prices; never mislead; never invent facts, reviews or results; be brief.
 Business facts:
 ${KB}`;
 
@@ -127,8 +130,9 @@ Review it and act:
   Search terms so far (private, not in the public snapshot): ${ads ? JSON.stringify(ads).slice(0, 9000) : 'no report yet'}
   Add negatives (add_ads_negatives) only for search terms that clearly show no intent to buy a house-history print or a new-home/housewarming/Christmas gift: people after free or official records (deeds, Land Registry, planning, census), house prices or valuations, jobs or courses, other products (canvas, wallpaper, posters of famous maps), other brands or places to visit. Prefer one distinctive word as BROAD, or the exact term as EXACT. Never block terms about house history prints, old maps of a street, personalised house prints, or new-home/housewarming gifts. Skip terms already negative or pending.
   If google_ads.stale is true for a second day, or ads are disapproved, or the campaign is not serving for a reason only Reece can fix (billing/payment, account suspended), email Reece once with the exact fix. Low clicks alone are not a reason to email.
+  Since 23 Nov the campaign is PAUSED on purpose (Reece wants the focus on estate agents): a paused campaign is not a problem; never email about it.
 - Sales tracking for Google Ads uses the offline import route; Stripe payment-link redirects and Stripe key permissions are NOT needed. Never email Reece about them.
-- Email Reece ONLY if he must do something himself (approve a card charge such as a Claude credit top-up when the prepaid $20 is nearly used, create an account, a system that keeps failing, or anything that needs a decision). Do not send routine summaries.
+- Email Reece ONLY if he must do something himself (approve a card charge such as a Claude credit top-up when the prepaid $20 is nearly used, create an account, a system that keeps failing, or anything that needs a decision). Do not send routine summaries, FYIs, or reports of glitches the system or a code session can handle.
 Finish with a 1-3 line note of what you did.`,
     tools: ['restart_order', 'set_outreach', 'add_ads_negatives', 'email_owner'],
     maxTurns: 10,
@@ -136,24 +140,19 @@ Finish with a 1-3 line note of what you did.`,
 }
 
 export async function growthAgent(env) {
+  // Estate agents only (Reece, 23 Nov 2026). No pitches, no web search, no emails to Reece: the weekly update carries this note.
   const status = await buildStatus(env);
-  const recent = (await env.DB.prepare(`SELECT outlet, kind, status, created_at FROM outbox_queue ORDER BY created_at DESC LIMIT 40`).all()).results;
   return runAgent(env, {
-    system: `You are the weekly growth agent. ${RULES}`,
+    system: `You are the weekly growth agent for the estate-agent channel. ${RULES}`,
     prompt: `Status snapshot (JSON, privacy-scrubbed):
 ${JSON.stringify(status).slice(0, 12000)}
 
-Pitches queued or sent recently (do not repeat outlets): ${JSON.stringify(recent)}
-
-Your job this week:
-1. Estate-agent outreach volume: if bounces are under 3% and there are no complaint signs, you may raise new agencies per weekday by up to 10 (max 40); if replies are poor or bounces high, lower it or pause. Use set_outreach once at most, with a reason.
-2. Consumer reach: use web search to find 8-15 NEW relevant contacts with an email address they publish for press, editorial, gift-guide or business enquiries: Manchester and North West lifestyle and property editors, Christmas gift guides (before mid-December), interiors and home bloggers, local history societies, and partners who meet people moving home (independent removal firms, conveyancers, new-build developers' customer teams). Skip big national outlets unless there's a named gift-guide editor with a published address.
-3. For each, write a short, personal, honest pitch (under 150 words) as Reece: what House Almanac is (their street on a historic Ordnance Survey map, usually Victorian, the same spot today, a researched history and timeline, framed A3 from £89, unframed £39, free UK delivery, order by 9 December for Christmas, gift vouchers emailed instantly at https://housealmanac.co.uk/gift), why it suits their readers or customers, and one clear ask (feature in a gift guide, a partnership, a referral arrangement). You may offer to make them a free digital print of a street of their choice (they reply with the address; the inbox makes it automatically). Sign as "Reece, House Almanac"; don't describe him as a sole trader. Link https://housealmanac.co.uk. Queue each with queue_pitch, including the page where you found the address.
-4. Email Reece only if he must act.
-Finish with a short note: what you changed and how many pitches you queued, by kind.`,
-    tools: ['set_outreach', 'queue_pitch', 'email_owner'],
-    serverTools: [webSearchTool(20)],
-    maxTurns: 14,
+Your job this week (estate agents only):
+1. Outreach volume: if bounces are under 3% and there are no complaint signs, you may raise new agencies per weekday by up to 10 (max 40); if replies are poor or bounces high, lower it or pause. Bear in mind free office samples left and the Claude credit (outreach pauses itself when credit runs low). Use set_outreach once at most, with a reason.
+2. Read the funnel: agencies emailed, follow-ups, replies by intent, interested, samples sent, paying agencies, proofs awaiting payment.
+Finish with a short plain-text note (under 120 words) for Reece's weekly update: the funnel in numbers, what you changed, and the one thing that would most improve agent sign-ups next week.`,
+    tools: ['set_outreach'],
+    maxTurns: 4,
   });
 }
 
