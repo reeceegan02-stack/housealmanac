@@ -164,8 +164,10 @@ Prints sent to the printer: ${printed.reduce((a, r) => a + r.n, 0)} (about £${p
 Estate agents: ${newAgencies} new agencies emailed and ${followUps} follow-ups this week; ${total} contacted in total.
 Replies this week: ${replies.map(r => `${r.n} ${String(r.intent || 'other').replace(/_/g, ' ')}`).join(', ') || 'none'}.
 Interested so far: ${st.interested || 0}. Free office samples sent: ${samples.used} of ${samples.cap}. Paying agencies: ${samples.paying}.
-${ads.connected && ads.last_7d?.spend > 0.5 ? `\nGoogle Ads (paused 23 Nov to focus on agents): £${ads.last_7d.spend.toFixed(2)} spent this week, ${ads.last_7d.conversions} sales tracked.\n` : ''}
-${growthNote ? `Agent plan for this week:\n${growthNote.replace(/\*\*/g, '').slice(0, 1200)}\n\n` : ''}Running costs: Claude API about $${(promoUsd + paidUsd).toFixed(0)} used ($${promoUsd.toFixed(0)} of the free $100 until 24 Nov, then $${paidUsd.toFixed(0)} of $${PREPAID_USD} prepaid).
+
+Google Ads: ${ads.connected ? `£${ads.last_7d.spend.toFixed(2)} spent this week (${ads.last_7d.clicks} clicks, ${ads.last_7d.conversions} sales tracked); £${ads.total.spend.toFixed(2)} of the £${ads.cap_gbp} cap so far.` : 'monitor not reporting yet.'}
+
+${growthNote ? `Agent plan for this week:\n${growthNote.replace(/\*\*/g, '').slice(0, 1200)}\n\n` : ''}Running costs: Claude API about $${(promoUsd + paidUsd).toFixed(0)} used ($${promoUsd.toFixed(0)} of the free $100 until 24 Nov, then $${paidUsd.toFixed(0)} of about $${PREPAID_USD} credit: $20 prepaid + free $100 to 24 Dec).
 
 ${needs.length ? `Needs you:\n${needs.map(n => `- ${n}`).join('\n')}` : 'Nothing needs you this week.'}
 

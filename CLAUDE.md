@@ -14,9 +14,10 @@ Standing approvals from Reece (9 Nov 2026): "full control" of marketing, orders,
   (1) any charge to his card — show item + total for a one-word yes (a hard rule), batching where possible; (2) things only he can do
   (creating accounts, entering card/ID/keys). Track spend vs the £2,000 in business/ledger.csv (budget line at the bottom of this file).
 
-**Focus (Reece, 23 Nov 2026): "focus on estate agents not all this other stuff".** Agents are the only growth channel. Google Ads campaign
-paused 23 Nov (£36.87 spent, 47 clicks, 0 sales); Etsy Ads NOT started (the 24 Nov switch-on was cancelled). Website, Etsy listings and
-vouchers stay up and take orders, with no paid promotion. Don't email Reece FYIs; the weekly update is his one regular email.
+**Focus (Reece, 23 Nov 2026): "we shouldn't be emailing law firms and stuff when we are trying to get estate agents to buy".** Cold outreach
+goes to estate agents only (no press, gift-guide, blogger, conveyancer or other partner pitches). Consumer channels KEEP GOING: "google and
+etsy should all keep going" (Google Ads re-enabled 23 Nov after a 1-hour pause; Etsy Ads switch on 24 Nov as approved). Don't email Reece
+FYIs; the weekly update is his one regular email.
 
 ## Rules that always apply
 - Never enter passwords, card/bank details or ID, never create accounts — Reece does those.
@@ -139,7 +140,10 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
   · GET|POST /admin/prospects · GET /admin/events · POST /admin/send · POST /admin/summary · POST /admin/order/:id/set (fields) · POST /admin/stripe/reconcile · POST /admin/etsy/poll
   · POST /admin/outreach/run · POST /admin/outreach/find {area} · POST /admin/outreach/preview {email} · GET /admin/samples · GET /admin/check
   A restarted order reuses its saved research (data_json); set data_json to null first to force fresh research.
-- Claude API: Reece's Console org, $100 free credit until 24 Nov 2026, then $20 prepaid (bought 9 Nov, auto-reload OFF by Reece's choice).
+- Claude API: Reece's Console org. Free $100 credit (29 Oct, to 24 Nov), $20 prepaid (bought 9 Nov), and another FREE $100 API credit granted
+  21 Nov (expires 24 Dec; $0 invoice, not a purchase). Balance $151.79 on 23 Nov before the 24 Nov expiry. Auto-reload OFF by Reece's choice.
+  ORG MONTHLY SPEND LIMIT is $75 (Console → Spend limits): $68.21 used by 23 Nov; when it's hit every API call fails (orders, inbox, outreach)
+  until the 1st. Raising it charges nothing (credit is prepaid) but is an account setting, so it needs Reece's yes.
   ~$0.30 per order. The worker estimates usage (kv claude_usd_*) and emails hello@ when under ~$5 is left; top-ups need Reece's yes.
   Burn on 18 Nov: ~$6 per weekday, mostly agent office previews. Once only $6 of prepaid is left, outreach and pitches pause automatically
   (controls.js creditReserveHit) so customer orders can still be researched. After any top-up, raise PREPAID_USD in claude.js.
@@ -177,5 +181,5 @@ Worker `housealmanac-ops` (code in `ops/`, deploys automatically from GitHub `ma
 - `ops/` cloud operations worker · `site/` website · `pipeline/` print templates and render scripts · `marketing/` mockups, Etsy listing, ad copy · `business/` pricing model, ledger, prospects.
 
 ## Budget tracker (£2,000 all-in, from 9 Nov 2026)
-Spent to 19 Nov: £148.46 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency samples 1-2 £102.60, Etsy fees £2.98, 5 extra Etsy listings £0.80), plus Google Ads £36.87 to 23 Nov, then paused (687 impressions, 47 clicks, 0 sales; billed later to Reece's bank: log the invoice in the ledger when it arrives). Approved, not yet bought: Claude credit top-up $100 (~£95) when it's nearly used up (check scheduled 25 Nov). Committed: 7 more free unframed samples × £21.66 (Reece approved the increase 20 Nov); Etsy Ads (~£65) cancelled 23 Nov (agent focus). Google Ads paused 23 Nov; the £280 cap stays in place if it is ever re-enabled (spend is billed to his bank, log it from Billing → Summary).
+Spent to 19 Nov: £148.46 (domain £4.10, test print £15.48, Cloudflare £3.90/mo, Claude credit £18.60, free agency samples 1-2 £102.60, Etsy fees £2.98, 5 extra Etsy listings £0.80), plus Google Ads £36.87 to 23 Nov (687 impressions, 47 clicks, 0 sales; billed later to Reece's bank: log the invoice in the ledger when it arrives). Approved, not yet bought: Claude credit top-up $100 (~£95) when it's nearly used up (check scheduled 25 Nov). Committed: 7 more free unframed samples × £21.66 (Reece approved the increase 20 Nov); Etsy Ads up to ~£65 (Reece said yes 9 Nov and again 23 Nov: £4/day, 24 Nov–9 Dec; scheduled reminders switch it on 24 Nov and off 9 Dec); Google Ads up to £280 (campaign total cap, Reece agreed max £300 on 18 Nov; spend is billed to his bank, log it from Billing → Summary).
 Keep this line current; the weekly growth agent recomputes it from business/ledger.csv.

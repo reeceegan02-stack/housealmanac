@@ -5,7 +5,7 @@ import { kvGet, kvSet, logEvent } from './util.js';
 import { sendMail } from './mail.js';
 import { outreachPaused } from './controls.js';
 
-// Press / gift-guide / blogger / partner pitches: off (Reece, 23 Nov 2026: "focus on estate agents not all this other stuff").
+// Press / gift-guide / blogger / partner pitches: off (Reece, 23 Nov 2026: no emailing law firms and the like; outreach is for estate agents).
 const PITCHES_ON = false;
 
 const ukHour = () => Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }).format(new Date()));

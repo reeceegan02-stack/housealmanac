@@ -5,7 +5,7 @@ import { kvGet, kvSet, extractJson } from './util.js';
 // Prices are estimates per million tokens; web search is $10 per 1,000 searches.
 const PRICE = { 'claude-sonnet-5-5': [3, 15], 'claude-haiku-5-5': [1, 5] };
 export const PROMO_ENDS = '2026-11-24'; // free credit covers usage until then
-export const PREPAID_USD = 20;          // bought 9 Nov 2026
+export const PREPAID_USD = 120;         // $20 bought 9 Nov 2026 + free $100 API credit granted 21 Nov (expires 24 Dec); check the real balance in Console
 
 async function trackUsage(env, model, u = {}) {
   try {
