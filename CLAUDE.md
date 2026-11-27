@@ -86,8 +86,8 @@ All 6 Etsy listing descriptions updated 20 Nov: unframed = 308gsm Hahnemühle Ph
   Bank ••50 verified 18 Nov; ad APPROVED and campaign SERVING (learning) 18 Nov 14:49. Never link the BICS (NW) Business Profile Google offers.
   Billing in practice: automatic payments to Visa ••5781 (threshold charge £50 on 25 Nov; next 1 Dec or at £100). Log spend from Billing → Summary.
   **Advertiser verification** (Admin → Policy → Account), started by Reece 27 Nov: org questions + agency/client info done (he answered as an
-  agency with himself as the client; disclosure reads "Ads funded by Reece Egan-Sheath", GB). Google review takes 1-10 days. Still open:
-  the required 1-minute "Do you plan to run EU political ads?" question (answer: No; it's a declaration, so Reece's yes first).
+  agency with himself as the client; disclosure reads "Ads funded by Reece Egan-Sheath", GB). Google review takes 1-10 days. EU political ads
+  question answered "No" 27 Nov (Reece said yes). Only the optional "who pays for your client's ads" task is left (not needed). Check result ~4 Dec.
   **Monitoring (no API keys), LIVE 18 Nov**: Google Ads script "House Almanac monitor" (Tools → Bulk actions → Scripts, id 12742311, authorised,
   Frequency: Hourly) is a 2-line loader that evals GET /ads/script.js (code in ops/src/ads.js): posts stats + search terms to POST /ads/report,
   applies commands from GET /ads/commands (negatives, pause/enable, offline conversions). Daily ops agent reviews search terms and queues negatives
